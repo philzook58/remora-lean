@@ -2,6 +2,9 @@
 
 Validated 2026-11-10 on x86_64 Linux, AMD Ryzen 7 PRO 7840U. This is a local
 correctness/integration run, not a controlled performance benchmark.
+For the later warmed latency comparison and optimization priorities, see
+[the layer/kernel profile](mlir-yolo-profile.md); the cold timings here should
+not be used as the steady-state baseline.
 
 The compiler accepts the existing `examples/darknet/yolov4.remora` unchanged.
 No source convolution/matmul primitives, Futhark executable, VeIR dependency,

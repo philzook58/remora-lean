@@ -1,0 +1,389 @@
+{
+  "date": "2026-11-10",
+  "source_commit": "f5e418b",
+  "cpu": "AMD Ryzen 7 PRO 7840U",
+  "threads_per_engine": 8,
+  "warmup": 2,
+  "iterations": 7,
+  "latency": {
+    "iree_resident": {
+      "median_ms": 1454.4267720048083,
+      "min_ms": 1399.7481409896864,
+      "max_ms": 1562.7821770031005,
+      "samples_ms": [
+        1436.6301899863174,
+        1454.4267720048083,
+        1456.6034089948516,
+        1399.7481409896864,
+        1480.2728890063008,
+        1413.316392005072,
+        1562.7821770031005
+      ]
+    },
+    "iree_host_args": {
+      "median_ms": 1566.294835996814,
+      "min_ms": 1546.6335119999712,
+      "max_ms": 1629.130836998229,
+      "samples_ms": [
+        1551.307342000655,
+        1566.294835996814,
+        1578.6964429862564,
+        1555.1660369965248,
+        1629.130836998229,
+        1546.6335119999712,
+        1584.7710429952713
+      ]
+    },
+    "opencv_forward": {
+      "median_ms": 458.8355089945253,
+      "min_ms": 422.5594260060461,
+      "max_ms": 482.5277360068867,
+      "samples_ms": [
+        457.10164500633255,
+        462.7836810104782,
+        461.461334998603,
+        422.5594260060461,
+        435.94103198847733,
+        458.8355089945253,
+        482.5277360068867
+      ]
+    },
+    "opencv_decode": {
+      "median_ms": 6.252056991797872,
+      "min_ms": 6.0475630016298965,
+      "max_ms": 7.698879009694792,
+      "samples_ms": [
+        6.927787995664403,
+        6.252056991797872,
+        6.0475630016298965,
+        6.237551002413966,
+        7.698879009694792,
+        6.205971003510058,
+        6.533756997669116
+      ]
+    },
+    "opencv_total": {
+      "median_ms": 465.04147999803536,
+      "min_ms": 428.7969770084601,
+      "max_ms": 489.0614930045558,
+      "samples_ms": [
+        464.02943300199695,
+        469.03573800227605,
+        467.5088980002329,
+        428.7969770084601,
+        443.6399109981721,
+        465.04147999803536,
+        489.0614930045558
+      ]
+    }
+  },
+  "initial_upload_ms": 158.06511499977205,
+  "worker_tile_share_percent": {
+    "matmul (including fused epilogues)": 41.38933437867898,
+    "gathers / window materialization": 25.618142552091705,
+    "integer index arrays": 14.916427282742074,
+    "other maps / broadcasts / padding": 14.446665156571973,
+    "copies": 2.9532403703150925,
+    "reductions": 0.6021567841583302,
+    "transposes": 0.07403347544184526
+  },
+  "worker_metric_note": "sum of CPU worker-tile execution time; NOT wall-clock shares",
+  "hot_kernels": [
+    {
+      "key": "main_dispatch_343_matmul_like_512x1444x2304_f32",
+      "category": "matmul (including fused epilogues)",
+      "worker_tile_percent": 7.388526145616245
+    },
+    {
+      "key": "main_dispatch_520_matmul_like_1024x361x4608_f32",
+      "category": "matmul (including fused epilogues)",
+      "worker_tile_percent": 6.32755202608143
+    },
+    {
+      "key": "main_dispatch_166_matmul_like_256x5776x1152_f32",
+      "category": "matmul (including fused epilogues)",
+      "worker_tile_percent": 4.9992126692030885
+    },
+    {
+      "key": "main_dispatch_375_matmul_like_256x1444x2304_f32",
+      "category": "matmul (including fused epilogues)",
+      "worker_tile_percent": 4.97394671304678
+    },
+    {
+      "key": "main_dispatch_197_elementwise_broadcast_6653952_f32",
+      "category": "gathers / window materialization",
+      "worker_tile_percent": 4.721967443491508
+    },
+    {
+      "key": "main_dispatch_198_matmul_like_128x5776x1152_f32",
+      "category": "matmul (including fused epilogues)",
+      "worker_tile_percent": 4.632618400705968
+    },
+    {
+      "key": "main_dispatch_30_elementwise_broadcast_53231616_i64",
+      "category": "integer index arrays",
+      "worker_tile_percent": 4.264077786626745
+    },
+    {
+      "key": "main_dispatch_374_elementwise_broadcast_3326976_f32",
+      "category": "gathers / window materialization",
+      "worker_tile_percent": 3.490250896354895
+    },
+    {
+      "key": "main_dispatch_677_elementwise_broadcast_31236608_f32",
+      "category": "gathers / window materialization",
+      "worker_tile_percent": 3.162275297458464
+    },
+    {
+      "key": "main_dispatch_29_elementwise_broadcast_32x9x372100_f32",
+      "category": "other maps / broadcasts / padding",
+      "worker_tile_percent": 2.989714572421091
+    },
+    {
+      "key": "main_dispatch_676_elementwise_broadcast_62473216_i64",
+      "category": "integer index arrays",
+      "worker_tile_percent": 2.368170475550427
+    },
+    {
+      "key": "main_dispatch_552_matmul_like_512x361x4608_f32",
+      "category": "matmul (including fused epilogues)",
+      "worker_tile_percent": 2.100707546598448
+    },
+    {
+      "key": "main_dispatch_31_elementwise_broadcast_26615808_f32",
+      "category": "gathers / window materialization",
+      "worker_tile_percent": 1.746254650479356
+    },
+    {
+      "key": "main_dispatch_32_matmul_like_64x92416x288_f32",
+      "category": "matmul (including fused epilogues)",
+      "worker_tile_percent": 1.6466726223300931
+    },
+    {
+      "key": "main_dispatch_122_elementwise_broadcast_13307904_f32",
+      "category": "gathers / window materialization",
+      "worker_tile_percent": 1.5818719090074995
+    }
+  ],
+  "isolated_pieces": [
+    {
+      "name": "conv_stride",
+      "input_shape": [
+        32,
+        608,
+        608
+      ],
+      "output_channels": 64,
+      "kernel": 3,
+      "stride": 2,
+      "timings": {
+        "iree": {
+          "median_ms": 257.8682570019737,
+          "min_ms": 244.9390929978108,
+          "max_ms": 260.57042300817557,
+          "samples_ms": [
+            257.8682570019737,
+            252.89875401358586,
+            260.57042300817557,
+            244.9390929978108,
+            258.0974000011338,
+            259.4397460052278,
+            254.9120649928227
+          ]
+        },
+        "opencv": {
+          "median_ms": 16.691185999661684,
+          "min_ms": 15.763900009915233,
+          "max_ms": 22.342943004332483,
+          "samples_ms": [
+            16.23977599956561,
+            22.342943004332483,
+            15.763900009915233,
+            19.1975130001083,
+            16.465471009723842,
+            19.111982008325867,
+            16.691185999661684
+          ]
+        }
+      }
+    },
+    {
+      "name": "conv_same",
+      "input_shape": [
+        256,
+        38,
+        38
+      ],
+      "output_channels": 512,
+      "kernel": 3,
+      "stride": 1,
+      "timings": {
+        "iree": {
+          "median_ms": 41.63325999979861,
+          "min_ms": 41.29189800005406,
+          "max_ms": 44.30250400037039,
+          "samples_ms": [
+            41.63325999979861,
+            43.08587500418071,
+            44.30250400037039,
+            41.366587989614345,
+            42.10356599651277,
+            41.35013800987508,
+            41.29189800005406
+          ]
+        },
+        "opencv": {
+          "median_ms": 5.153049001819454,
+          "min_ms": 3.87297899578698,
+          "max_ms": 5.273585993563756,
+          "samples_ms": [
+            4.458380994037725,
+            5.213543001445942,
+            5.273585993563756,
+            5.2491389942588285,
+            5.153049001819454,
+            4.838516004383564,
+            3.87297899578698
+          ]
+        },
+        "opencv_winograd_off": {
+          "median_ms": 15.06736000010278,
+          "min_ms": 13.67734299856238,
+          "max_ms": 15.164270997047424,
+          "samples_ms": [
+            13.67734299856238,
+            14.311015998828225,
+            15.164270997047424,
+            15.06736000010278,
+            15.029116999357939,
+            15.088329004356638,
+            15.124577010283247
+          ]
+        }
+      }
+    },
+    {
+      "name": "conv_1x1",
+      "input_shape": [
+        128,
+        304,
+        304
+      ],
+      "output_channels": 64,
+      "kernel": 1,
+      "stride": 1,
+      "timings": {
+        "iree": {
+          "median_ms": 51.487648001057096,
+          "min_ms": 47.48082600417547,
+          "max_ms": 60.03047700505704,
+          "samples_ms": [
+            60.03047700505704,
+            50.927443997352384,
+            50.50004900840577,
+            47.48082600417547,
+            53.59958299959544,
+            51.487648001057096,
+            51.51855599251576
+          ]
+        },
+        "opencv": {
+          "median_ms": 27.415911012212746,
+          "min_ms": 23.11113900213968,
+          "max_ms": 29.048323995084502,
+          "samples_ms": [
+            27.415911012212746,
+            28.190077995532192,
+            24.594230999355204,
+            28.602585007320158,
+            25.42021599947475,
+            29.048323995084502,
+            23.11113900213968
+          ]
+        }
+      }
+    },
+    {
+      "name": "pool13",
+      "input_shape": [
+        512,
+        19,
+        19
+      ],
+      "output_channels": null,
+      "kernel": 13,
+      "stride": 1,
+      "timings": {
+        "iree": {
+          "median_ms": 276.92521100107115,
+          "min_ms": 267.27444599964656,
+          "max_ms": 280.3734609915409,
+          "samples_ms": [
+            278.9438290055841,
+            272.84893799514975,
+            277.2566240018932,
+            267.27444599964656,
+            280.3734609915409,
+            275.6044550042134,
+            276.92521100107115
+          ]
+        },
+        "opencv": {
+          "median_ms": 3.454772988334298,
+          "min_ms": 2.911910996772349,
+          "max_ms": 3.985171002568677,
+          "samples_ms": [
+            3.0876509990775958,
+            3.585519007174298,
+            2.911910996772349,
+            3.454772988334298,
+            3.461364991380833,
+            2.9204769962234423,
+            3.985171002568677
+          ]
+        }
+      }
+    },
+    {
+      "name": "matrix_only",
+      "input_shape": [
+        2304,
+        38,
+        38
+      ],
+      "output_channels": 512,
+      "kernel": 1,
+      "stride": 1,
+      "timings": {
+        "iree": {
+          "median_ms": 16.848712009959854,
+          "min_ms": 13.794031998259015,
+          "max_ms": 21.053285992820747,
+          "samples_ms": [
+            16.848712009959854,
+            13.794031998259015,
+            16.240256998571567,
+            21.053285992820747,
+            16.36262699321378,
+            18.064290008624084,
+            16.973988997051492
+          ]
+        },
+        "opencv": {
+          "median_ms": 15.836858001421206,
+          "min_ms": 13.59478798985947,
+          "max_ms": 17.237984997336753,
+          "samples_ms": [
+            13.59478798985947,
+            15.87423800083343,
+            15.139355004066601,
+            17.237984997336753,
+            15.386119004688226,
+            16.053826999268495,
+            15.836858001421206
+          ]
+        }
+      }
+    }
+  ]
+}

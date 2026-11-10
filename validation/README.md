@@ -29,3 +29,6 @@ The exact-baseline comparison and code-growth measurements are in
 
 Direct MLIR/IREE execution of ordinary Remora YOLOv4, kernel checks, and the
 independent OpenCV comparison are recorded in [mlir-yolo.md](mlir-yolo.md).
+
+Warmed latency, CPU kernel attribution, and isolated convolution/pooling probes
+are recorded in [mlir-yolo-profile.md](mlir-yolo-profile.md).

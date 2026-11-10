@@ -124,6 +124,15 @@ This compares all attributes, not only selected detections. It reads OpenCV's ra
 convolution heads and decodes them in NumPy because OpenCV's Region layer
 thresholds class scores. OpenCV is only a validation dependency.
 
+## Profiling and optimization priorities
+
+The [warmed latency and layer/kernel breakdown](../validation/mlir-yolo-profile.md)
+corrects the initial cold timing comparison and isolates the main costs. IREE is
+about 3.1× slower in this warmed CPU run. Large index arrays, broadcasts, and
+window gathers are the first targets; the representative bare matrix product is
+already close to OpenCV. The report includes reusable profiling scripts and a
+controlled convolution-algorithm comparison.
+
 ## Limits and further work
 
 This is an experimental, unverified translation. External MLIR verifies target
