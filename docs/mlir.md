@@ -29,6 +29,12 @@ multi-axis computed frame constructors. Nested ordinary frame construction works
 There is no `mlir --run`, C API, GPU pipeline, or optimization framework here.
 The existing Futhark commands retain their behavior.
 
+## Understanding scheduling and compiler boundaries
+
+Start with the [Halide, IREE, and Mojo walkthrough](mlir-study.md). It includes a
+runnable scheduling example and an IREE experiment recognizing generic matrix
+multiplication. No new Remora primitives are introduced.
+
 ## Desired output for tensor kernels
 
 The [handwritten target contracts](mlir-targets/README.md) demonstrate matmul and

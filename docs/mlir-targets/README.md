@@ -42,7 +42,8 @@ operations; producing well-formed types alone does not establish source semantic
 
 ## Why this is a useful target
 
-- Keep contraction structure visible as named matmul/convolution operations.
+- Keep contraction structure visible as named operations or equivalent generic
+  indexing/reduction maps.
 - Use `linalg.generic` for explicit indexing and fused pointwise bias/activation.
 - Use zero-initialized destinations for reductions. `tensor.empty` alone does not
   provide the initial accumulator value.
@@ -67,33 +68,18 @@ In particular, padding is materialized in this baseline. Tiling/fusion and paddi
 placement need evaluation before calling the convolution implementation efficient.
 These counts describe this pipeline/version, not permanent golden text.
 
-## Bootstrap primitives, then recognize them
+## Source language decisions remain open
 
-Use a single target operation/lowering for both explicit calls and inferred
-patterns. Start with a deliberately small set: matrix multiplication and
-convolution. Bias and activations remain compositions of ordinary operations.
-Their source-facing syntax and primitive registration are not fixed by these
-fixtures.
+The [Halide/IREE/Mojo study](../mlir-study.md) supersedes the earlier proposal to
+bootstrap through new source primitives. IREE recognized an equivalent generic
+multiply/reduce as matrix-like, so we now have evidence for trying an ordinary
+Remora contraction first. Named target operations do not require named source
+primitives. The generic fixture and separate row schedule demonstrate these
+independent choices.
 
-1. Give each primitive a precise shape/axis contract and an executable reference
-   implementation. Validate the MLIR lowering against that implementation using
-   multiple channels, nonsymmetric filters, padding/stride cases, and random inputs.
-2. Allow an explicit, designated library operation to select that lowering.
-   Identify its resolved binding, not an arbitrary source name such as `matmul`.
-3. Normalize ordinary Remora maps, indexing, and reductions enough to recognize a
-   narrow contraction pattern. Lower a recognized pattern through the same target.
-   Leave unmatched code on the general lowering path.
-4. Extend recognition from dot products to matrix products, and subsequently to
-   convolution windows. A whole-network recognizer is unnecessary.
-
-Recognition must check axes, reduction domains, initialization, and shape
-constraints. Floating reduction reassociation requires an explicit numerical
-policy; it is not generally bitwise equivalent. We can allow those differences
-without creating compatibility shims, while making the intended rule clear.
-
-The next compiler milestone is producing these output structures from designated
-source operations, supported by reference comparisons. General pattern inference
-and optimization schedules are subsequent, independently testable steps.
+Preserve explicit access patterns, reduction domains, initialization, and shape
+constraints. Any later recognition rule or primitive can use the same target
+lowering. Source primitives remain an optional response to an observed problem.
 
 ## References
 
