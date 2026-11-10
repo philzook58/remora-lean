@@ -1,0 +1,26 @@
+;; A lifted lambda calls a global function and captures only the local value.
+;; ==
+;; output { [7 9 11] }
+(def (fun (twice (x Int)) (+ x x)))
+(entry (main)
+  (let ((val a 5))
+    ((fn ((x Int)) (+ (twice x) a)) [1 2 3])))
+
+;; Local definitions share their code while retaining the captured value.
+;; ==
+;; entry: local
+;; output { [11 12 13] }
+(entry (local)
+  (let ((val a 5)
+        (fun (add-a (x Int)) (+ a x))
+        (fun (add-twice (x Int)) (add-a (add-a x))))
+    (add-twice [1 2 3])))
+
+;; Lifted functions precede global value bindings in the emitted program.
+;; Capture that value explicitly instead of assuming it is already in backend scope.
+;; ==
+;; entry: global-value
+;; output { [6 7 8] }
+(def (val offset 5))
+(entry (global-value)
+  ((fn ((x Int)) (+ offset x)) [1 2 3]))

@@ -68,6 +68,10 @@ partial def bindings (env : List (VName × Exp)) (bs : List Bind) (body : Exp)
     (t : Info (ArrayType VName)) (p : SourcePos) : Exp :=
   match bs with
   | [] => specialize env body
+  -- Ordinary functions stay shared; only polymorphic definitions need specialization.
+  | .funE v ps mt e ft bp :: bs =>
+    let b := BindBase.funE v ps mt (specialize env e) ft bp
+    .letE ⟨b,[]⟩ (bindings env bs body t p) t p
   | b::bs =>
     match bindValue b with
     | some (v,e) =>
@@ -83,6 +87,9 @@ def monomorphize (p : Prog) : Prog := Id.run do
   let mut ds := []
   for d in p.progDecs do
     match d with
+    -- Preserve calls rather than copying a named function's body at every use.
+    | .defE (.funE v ps mt body t pos) =>
+      ds := ds ++ [.defE (.funE v ps mt (specialize env body) t pos)]
     | .defE b =>
       if let some (v,e) := bindValue b then
         let e := specialize env e

@@ -14,3 +14,5 @@ jobs:
           build: 'true'
           test: 'true'
           use-mathlib-cache: 'false'
+      - name: Check compiler growth
+        run: python3 -m unittest discover -s scripts

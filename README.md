@@ -58,3 +58,8 @@ lake exe remora test --modes compile --exclude-tags higher-order,existential,nat
 The exclusions retain visibility of the upstream compiler limitations and the native
 Lean numeric behavior checks. The full compiler corpus still has expected and
 unclassified failures; see PORTING.md.
+
+The [compiler audit](validation/compiler-audit.md) compares the exact upstream
+baseline, documents backend-version differences, and measures intermediate code
+growth. Ordinary named functions now remain shared; repeated polymorphic instances
+still need targeted sharing.

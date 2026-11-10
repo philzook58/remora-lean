@@ -1,0 +1,1580 @@
+{
+  "futhark_version": "Futhark 0.25.33.",
+  "upstream": "/tmp/remora-baseline",
+  "port": ".lake/build/bin/remora",
+  "upstream_checker": "/tmp/remora-upstream-ir-check",
+  "cases": [
+    {
+      "file": "tests/accel.remora",
+      "upstream": {
+        "status": "valid",
+        "ir_bytes": 2938,
+        "error": ""
+      },
+      "port": {
+        "status": "valid",
+        "ir_bytes": 2161,
+        "error": ""
+      }
+    },
+    {
+      "file": "tests/basic0.remora",
+      "upstream": {
+        "status": "valid",
+        "ir_bytes": 763,
+        "error": ""
+      },
+      "port": {
+        "status": "valid",
+        "ir_bytes": 386,
+        "error": ""
+      }
+    },
+    {
+      "file": "tests/basic1.remora",
+      "upstream": {
+        "status": "valid",
+        "ir_bytes": 176,
+        "error": ""
+      },
+      "port": {
+        "status": "valid",
+        "ir_bytes": 148,
+        "error": ""
+      }
+    },
+    {
+      "file": "tests/basic2.remora",
+      "upstream": {
+        "status": "valid",
+        "ir_bytes": 549,
+        "error": ""
+      },
+      "port": {
+        "status": "valid",
+        "ir_bytes": 386,
+        "error": ""
+      }
+    },
+    {
+      "file": "tests/basic3.remora",
+      "upstream": {
+        "status": "valid",
+        "ir_bytes": 1010,
+        "error": ""
+      },
+      "port": {
+        "status": "valid",
+        "ir_bytes": 628,
+        "error": ""
+      }
+    },
+    {
+      "file": "tests/basic4.remora",
+      "upstream": {
+        "status": "valid",
+        "ir_bytes": 769,
+        "error": ""
+      },
+      "port": {
+        "status": "valid",
+        "ir_bytes": 597,
+        "error": ""
+      }
+    },
+    {
+      "file": "tests/basic5.remora",
+      "upstream": {
+        "status": "valid",
+        "ir_bytes": 931,
+        "error": ""
+      },
+      "port": {
+        "status": "valid",
+        "ir_bytes": 567,
+        "error": ""
+      }
+    },
+    {
+      "file": "tests/box0.remora",
+      "upstream": {
+        "status": "lowering-error",
+        "error": "remora-baseline: compileAtom: unhandled:\n(box 3 (array [3] 1 2 3) (\u03a3 $d_146 [Int $d_146]))\n\nCallStack (from HasCallStack):\n  error, called at src/Futhark.hs:34:17 in main:Futhark\nHasCallStack backtrace:\n  collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:169:13 in ghc-internal:GHC.Internal.Exception\n  toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:204:5 in ghc-internal:GHC.Internal.Exception\n  error, called at src/Futhark.hs:34:17 in main:Futhark"
+      },
+      "port": {
+        "status": "lowering-error",
+        "error": "Futhark: function literals require lambda lifting"
+      }
+    },
+    {
+      "file": "tests/box1.remora",
+      "upstream": {
+        "status": "lowering-error",
+        "error": "remora-baseline: compileAtom: unhandled:\n(box 1 (box 2 100 (\u03a3 $e_147 Int)) (\u03a3 $d_146 (\u03a3 $e_147 Int)))\n\nCallStack (from HasCallStack):\n  error, called at src/Futhark.hs:34:17 in main:Futhark\nHasCallStack backtrace:\n  collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:169:13 in ghc-internal:GHC.Internal.Exception\n  toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:204:5 in ghc-internal:GHC.Internal.Exception\n  error, called at src/Futhark.hs:34:17 in main:Futhark"
+      },
+      "port": {
+        "status": "lowering-error",
+        "error": "Futhark: function literals require lambda lifting"
+      }
+    },
+    {
+      "file": "tests/box2.remora",
+      "upstream": {
+        "status": "lowering-error",
+        "error": "remora-baseline: compileAtom: unhandled:\n(box 2 (box 3 (array [2 3] 1 2 3 4 5 6) (\u03a3 $e_147 [Int 2 $e_147])) (\u03a3 $d_146 (\u03a3 $e_147 [Int $d_146 $e_147])))\n\nCallStack (from HasCallStack):\n  error, called at src/Futhark.hs:34:17 in main:Futhark\nHasCallStack backtrace:\n  collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:169:13 in ghc-internal:GHC.Internal.Exception\n  toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:204:5 in ghc-internal:GHC.Internal.Exception\n  error, called at src/Futhark.hs:34:17 in main:Futhark"
+      },
+      "port": {
+        "status": "lowering-error",
+        "error": "Futhark: function literals require lambda lifting"
+      }
+    },
+    {
+      "file": "tests/box3.remora",
+      "upstream": {
+        "status": "lowering-error",
+        "error": "remora-baseline: compileExp': unhandled:\n(unbox ($d_146 xs_149 (array [2] (box 2 (array [2] 1 2) (\u03a3 $n_147 [Int $n_147])) (box 2 (array [2] 3 4) (\u03a3 $n_148 [Int $n_148]))))\n  (sum_81 xs_149))\n\nCallStack (from HasCallStack):\n  error, called at src/Futhark.hs:95:17 in main:Futhark\nHasCallStack backtrace:\n  collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:169:13 in ghc-internal:GHC.Internal.Exception\n  toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:204:5 in ghc-internal:GHC.Internal.Exception\n  error, called at src/Futhark.hs:95:17 in main:Futhark"
+      },
+      "port": {
+        "status": "lowering-error",
+        "error": "Futhark: existential values are unsupported upstream"
+      }
+    },
+    {
+      "file": "tests/box4.remora",
+      "upstream": {
+        "status": "lowering-error",
+        "error": "remora-baseline: compileExp': unhandled:\n(unbox ($d_146 xs_151 (array [2 2] (box 1 (array [1] 1) (\u03a3 $n_147 [Int $n_147])) (box 1 (array [1] 2) (\u03a3 $n_148 [Int $n_148])) (box 1 (array [1] 3) (\u03a3 $n_149 [Int $n_149])) (box 1 (array [1] 4) (\u03a3 $n_150 [Int $n_150]))))\n  (sum_81 xs_151))\n\nCallStack (from HasCallStack):\n  error, called at src/Futhark.hs:95:17 in main:Futhark\nHasCallStack backtrace:\n  collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:169:13 in ghc-internal:GHC.Internal.Exception\n  toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:204:5 in ghc-internal:GHC.Internal.Exception\n  error, called at src/Futhark.hs:95:17 in main:Futhark"
+      },
+      "port": {
+        "status": "lowering-error",
+        "error": "Futhark: existential values are unsupported upstream"
+      }
+    },
+    {
+      "file": "tests/def0.remora",
+      "upstream": {
+        "status": "valid",
+        "ir_bytes": 652,
+        "error": ""
+      },
+      "port": {
+        "status": "valid",
+        "ir_bytes": 527,
+        "error": ""
+      }
+    },
+    {
+      "file": "tests/dot0.remora",
+      "upstream": {
+        "status": "valid",
+        "ir_bytes": 1194,
+        "error": ""
+      },
+      "port": {
+        "status": "valid",
+        "ir_bytes": 910,
+        "error": ""
+      }
+    },
+    {
+      "file": "tests/dotlib.remora",
+      "upstream": {
+        "status": "lowering-error",
+        "error": "compile: program has no entry point"
+      },
+      "port": {
+        "status": "lowering-error",
+        "error": "compile: program has no entry point"
+      }
+    },
+    {
+      "file": "tests/entry0.remora",
+      "upstream": {
+        "status": "valid",
+        "ir_bytes": 663,
+        "error": ""
+      },
+      "port": {
+        "status": "valid",
+        "ir_bytes": 550,
+        "error": ""
+      }
+    },
+    {
+      "file": "tests/flatten0.remora",
+      "upstream": {
+        "status": "valid",
+        "ir_bytes": 530,
+        "error": ""
+      },
+      "port": {
+        "status": "valid",
+        "ir_bytes": 356,
+        "error": ""
+      }
+    },
+    {
+      "file": "tests/fold0.remora",
+      "upstream": {
+        "status": "valid",
+        "ir_bytes": 501,
+        "error": ""
+      },
+      "port": {
+        "status": "valid",
+        "ir_bytes": 367,
+        "error": ""
+      }
+    },
+    {
+      "file": "tests/foldright0.remora",
+      "upstream": {
+        "status": "valid",
+        "ir_bytes": 638,
+        "error": ""
+      },
+      "port": {
+        "status": "valid",
+        "ir_bytes": 412,
+        "error": ""
+      }
+    },
+    {
+      "file": "tests/head0.remora",
+      "upstream": {
+        "status": "valid",
+        "ir_bytes": 551,
+        "error": ""
+      },
+      "port": {
+        "status": "valid",
+        "ir_bytes": 470,
+        "error": ""
+      }
+    },
+    {
+      "file": "tests/head1.remora",
+      "upstream": {
+        "status": "valid",
+        "ir_bytes": 740,
+        "error": ""
+      },
+      "port": {
+        "status": "valid",
+        "ir_bytes": 545,
+        "error": ""
+      }
+    },
+    {
+      "file": "tests/head2.remora",
+      "upstream": {
+        "status": "valid",
+        "ir_bytes": 666,
+        "error": ""
+      },
+      "port": {
+        "status": "valid",
+        "ir_bytes": 577,
+        "error": ""
+      }
+    },
+    {
+      "file": "tests/head3.remora",
+      "upstream": {
+        "status": "valid",
+        "ir_bytes": 696,
+        "error": ""
+      },
+      "port": {
+        "status": "valid",
+        "ir_bytes": 583,
+        "error": ""
+      }
+    },
+    {
+      "file": "tests/idxs-of.remora",
+      "upstream": {
+        "status": "valid",
+        "ir_bytes": 3071,
+        "error": ""
+      },
+      "port": {
+        "status": "valid",
+        "ir_bytes": 1587,
+        "error": ""
+      }
+    },
+    {
+      "file": "tests/import0.remora",
+      "upstream": {
+        "status": "lowering-error",
+        "error": "remora-baseline: compileAtomType: unhandled:\n(-> Float (-> Float Float))\n\nCallStack (from HasCallStack):\n  error, called at src/Futhark/Monad.hs:194:3 in main:Futhark.Monad\nHasCallStack backtrace:\n  collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:169:13 in ghc-internal:GHC.Internal.Exception\n  toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:204:5 in ghc-internal:GHC.Internal.Exception\n  error, called at src/Futhark/Monad.hs:194:3 in main:Futhark.Monad"
+      },
+      "port": {
+        "status": "lowering-error",
+        "error": "Futhark: only monomorphic first-order values can be lowered"
+      }
+    },
+    {
+      "file": "tests/index0.remora",
+      "upstream": {
+        "status": "valid",
+        "ir_bytes": 255,
+        "error": ""
+      },
+      "port": {
+        "status": "valid",
+        "ir_bytes": 219,
+        "error": ""
+      }
+    },
+    {
+      "file": "tests/infile0.remora",
+      "upstream": {
+        "status": "valid",
+        "ir_bytes": 245,
+        "error": ""
+      },
+      "port": {
+        "status": "valid",
+        "ir_bytes": 204,
+        "error": ""
+      }
+    },
+    {
+      "file": "tests/infile1.remora",
+      "upstream": {
+        "status": "valid",
+        "ir_bytes": 179,
+        "error": ""
+      },
+      "port": {
+        "status": "valid",
+        "ir_bytes": 167,
+        "error": ""
+      }
+    },
+    {
+      "file": "tests/infile2.remora",
+      "upstream": {
+        "status": "valid",
+        "ir_bytes": 935,
+        "error": ""
+      },
+      "port": {
+        "status": "valid",
+        "ir_bytes": 627,
+        "error": ""
+      }
+    },
+    {
+      "file": "tests/input0.remora",
+      "upstream": {
+        "status": "valid",
+        "ir_bytes": 245,
+        "error": ""
+      },
+      "port": {
+        "status": "valid",
+        "ir_bytes": 204,
+        "error": ""
+      }
+    },
+    {
+      "file": "tests/input1.remora",
+      "upstream": {
+        "status": "valid",
+        "ir_bytes": 179,
+        "error": ""
+      },
+      "port": {
+        "status": "valid",
+        "ir_bytes": 167,
+        "error": ""
+      }
+    },
+    {
+      "file": "tests/input2.remora",
+      "upstream": {
+        "status": "valid",
+        "ir_bytes": 190,
+        "error": ""
+      },
+      "port": {
+        "status": "valid",
+        "ir_bytes": 158,
+        "error": ""
+      }
+    },
+    {
+      "file": "tests/input3.remora",
+      "upstream": {
+        "status": "valid",
+        "ir_bytes": 245,
+        "error": ""
+      },
+      "port": {
+        "status": "valid",
+        "ir_bytes": 204,
+        "error": ""
+      }
+    },
+    {
+      "file": "tests/input4.remora",
+      "upstream": {
+        "status": "valid",
+        "ir_bytes": 141,
+        "error": ""
+      },
+      "port": {
+        "status": "valid",
+        "ir_bytes": 129,
+        "error": ""
+      }
+    },
+    {
+      "file": "tests/iota0.remora",
+      "upstream": {
+        "status": "lowering-error",
+        "error": "remora-baseline: compileExp': unhandled:\n(unbox ($d_146 contents_147 (iota_92 (array [1] 5)))\n  contents_147)\n\nCallStack (from HasCallStack):\n  error, called at src/Futhark.hs:95:17 in main:Futhark\nHasCallStack backtrace:\n  collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:169:13 in ghc-internal:GHC.Internal.Exception\n  toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:204:5 in ghc-internal:GHC.Internal.Exception\n  error, called at src/Futhark.hs:95:17 in main:Futhark"
+      },
+      "port": {
+        "status": "lowering-error",
+        "error": "Futhark: existential values are unsupported upstream"
+      }
+    },
+    {
+      "file": "tests/iota1.remora",
+      "upstream": {
+        "status": "valid",
+        "ir_bytes": 297,
+        "error": ""
+      },
+      "port": {
+        "status": "valid",
+        "ir_bytes": 169,
+        "error": ""
+      }
+    },
+    {
+      "file": "tests/issue34-flatten0.remora",
+      "upstream": {
+        "status": "lowering-error",
+        "error": "tests/issue34-flatten0.remora:3:4: error:\nIll-shaped application:\nParam type: [Int 3 1]\nArgument: (array [3] 1 2 3)\nArgument type: [Int 3]\nin\n((i-app (i-app (i-app (t-app flatten_83 Int) 3) 1) []) (array [3] 1 2 3))"
+      },
+      "port": {
+        "status": "lowering-error",
+        "error": "tests/issue34-flatten0.remora:3:3: Ill-shaped application: argument has no matching cell shape"
+      }
+    },
+    {
+      "file": "tests/issue34-flatten1.remora",
+      "upstream": {
+        "status": "lowering-error",
+        "error": "tests/issue34-flatten1.remora:3:4: error:\nIll-shaped application:\nParam type: [Int 2 3]\nArgument: (array [2 2] 1 2 3 4)\nArgument type: [Int 2 2]\nin\n((i-app (i-app (i-app (t-app flatten_83 Int) 2) 3) []) (array [2 2] 1 2 3 4))"
+      },
+      "port": {
+        "status": "lowering-error",
+        "error": "tests/issue34-flatten1.remora:3:3: Ill-shaped application: argument has no matching cell shape"
+      }
+    },
+    {
+      "file": "tests/issue34-reverse0.remora",
+      "upstream": {
+        "status": "lowering-error",
+        "error": "tests/issue34-reverse0.remora:3:4: error:\nIll-shaped application:\nParam type: [Int 3]\nArgument: (array [2] 1 2)\nArgument type: [Int 2]\nin\n((i-app (i-app (t-app reverse_69 Int) 3) []) (array [2] 1 2))"
+      },
+      "port": {
+        "status": "lowering-error",
+        "error": "tests/issue34-reverse0.remora:3:3: Ill-shaped application: argument has no matching cell shape"
+      }
+    },
+    {
+      "file": "tests/issue35-append0.remora",
+      "upstream": {
+        "status": "valid",
+        "ir_bytes": 329,
+        "error": ""
+      },
+      "port": {
+        "status": "valid",
+        "ir_bytes": 288,
+        "error": ""
+      }
+    },
+    {
+      "file": "tests/issue35-emptyarray0.remora",
+      "upstream": {
+        "status": "lowering-error",
+        "error": "tests/issue35-emptyarray0.remora:3:4: error:\nNon-atom kinded type annotation on empty array."
+      },
+      "port": {
+        "status": "lowering-error",
+        "error": "tests/issue35-emptyarray0.remora:3:3: Non-atom kinded annotation on empty array"
+      }
+    },
+    {
+      "file": "tests/issue35-emptyarray1.remora",
+      "upstream": {
+        "status": "lowering-error",
+        "error": "tests/issue35-emptyarray1.remora:3:4: error:\nNon-atom kinded type annotation on empty array."
+      },
+      "port": {
+        "status": "lowering-error",
+        "error": "tests/issue35-emptyarray1.remora:3:3: Non-atom kinded annotation on empty array"
+      }
+    },
+    {
+      "file": "tests/lambdalift0.remora",
+      "upstream": {
+        "status": "valid",
+        "ir_bytes": 392,
+        "error": ""
+      },
+      "port": {
+        "status": "valid",
+        "ir_bytes": 148,
+        "error": ""
+      }
+    },
+    {
+      "file": "tests/lambdalift1.remora",
+      "upstream": {
+        "status": "valid",
+        "ir_bytes": 514,
+        "error": ""
+      },
+      "port": {
+        "status": "valid",
+        "ir_bytes": 193,
+        "error": ""
+      }
+    },
+    {
+      "file": "tests/lambdalift2.remora",
+      "upstream": {
+        "status": "valid",
+        "ir_bytes": 360,
+        "error": ""
+      },
+      "port": {
+        "status": "valid",
+        "ir_bytes": 148,
+        "error": ""
+      }
+    },
+    {
+      "file": "tests/lambdalift3.remora",
+      "upstream": {
+        "status": "valid",
+        "ir_bytes": 482,
+        "error": ""
+      },
+      "port": {
+        "status": "valid",
+        "ir_bytes": 193,
+        "error": ""
+      }
+    },
+    {
+      "file": "tests/lambdalift4.remora",
+      "upstream": {
+        "status": "valid",
+        "ir_bytes": 687,
+        "error": ""
+      },
+      "port": {
+        "status": "valid",
+        "ir_bytes": 494,
+        "error": ""
+      }
+    },
+    {
+      "file": "tests/lambdalift5.remora",
+      "upstream": {
+        "status": "valid",
+        "ir_bytes": 570,
+        "error": ""
+      },
+      "port": {
+        "status": "valid",
+        "ir_bytes": 329,
+        "error": ""
+      }
+    },
+    {
+      "file": "tests/let0.remora",
+      "upstream": {
+        "status": "valid",
+        "ir_bytes": 429,
+        "error": ""
+      },
+      "port": {
+        "status": "valid",
+        "ir_bytes": 334,
+        "error": ""
+      }
+    },
+    {
+      "file": "tests/let1.remora",
+      "upstream": {
+        "status": "valid",
+        "ir_bytes": 251,
+        "error": ""
+      },
+      "port": {
+        "status": "valid",
+        "ir_bytes": 105,
+        "error": ""
+      }
+    },
+    {
+      "file": "tests/let2.remora",
+      "upstream": {
+        "status": "valid",
+        "ir_bytes": 799,
+        "error": ""
+      },
+      "port": {
+        "status": "valid",
+        "ir_bytes": 609,
+        "error": ""
+      }
+    },
+    {
+      "file": "tests/let3.remora",
+      "upstream": {
+        "status": "valid",
+        "ir_bytes": 799,
+        "error": ""
+      },
+      "port": {
+        "status": "valid",
+        "ir_bytes": 609,
+        "error": ""
+      }
+    },
+    {
+      "file": "tests/let4.remora",
+      "upstream": {
+        "status": "valid",
+        "ir_bytes": 661,
+        "error": ""
+      },
+      "port": {
+        "status": "valid",
+        "ir_bytes": 555,
+        "error": ""
+      }
+    },
+    {
+      "file": "tests/let5.remora",
+      "upstream": {
+        "status": "valid",
+        "ir_bytes": 368,
+        "error": ""
+      },
+      "port": {
+        "status": "valid",
+        "ir_bytes": 309,
+        "error": ""
+      }
+    },
+    {
+      "file": "tests/mono0.remora",
+      "upstream": {
+        "status": "valid",
+        "ir_bytes": 424,
+        "error": ""
+      },
+      "port": {
+        "status": "valid",
+        "ir_bytes": 104,
+        "error": ""
+      }
+    },
+    {
+      "file": "tests/mono1.remora",
+      "upstream": {
+        "status": "lowering-error",
+        "error": "remora-baseline: compileAtomType: unhandled:\n(-> Int Int)\n\nCallStack (from HasCallStack):\n  error, called at src/Futhark/Monad.hs:194:3 in main:Futhark.Monad\nHasCallStack backtrace:\n  collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:169:13 in ghc-internal:GHC.Internal.Exception\n  toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:204:5 in ghc-internal:GHC.Internal.Exception\n  error, called at src/Futhark/Monad.hs:194:3 in main:Futhark.Monad"
+      },
+      "port": {
+        "status": "lowering-error",
+        "error": "Futhark: unknown value lifted_1000000"
+      }
+    },
+    {
+      "file": "tests/mono10.remora",
+      "upstream": {
+        "status": "lowering-error",
+        "error": "remora-baseline: defunBind: unsupported index abstraction:\n(lam_mono_157 (@q_160)\n  (let ((lam_mono_161 ((x_166 [Int @q_160]))\n          (let ((lam_162 ((xs_163 [Int @q_160])) (sum_81 xs_163)))\n            (lam_162 x_166))))\n    lam_mono_161))\n\nCallStack (from HasCallStack):\n  error, called at src/Defunctionalize.hs:83:7 in main:Defunctionalize\nHasCallStack backtrace:\n  collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:169:13 in ghc-internal:GHC.Internal.Exception\n  toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:204:5 in ghc-internal:GHC.Internal.Exception\n  error, called at src/Defunctionalize.hs:83:7 in main:Defunctionalize"
+      },
+      "port": {
+        "status": "lowering-error",
+        "error": "Futhark: existential values are unsupported upstream"
+      }
+    },
+    {
+      "file": "tests/mono11.remora",
+      "upstream": {
+        "status": "valid",
+        "ir_bytes": 235,
+        "error": ""
+      },
+      "port": {
+        "status": "valid",
+        "ir_bytes": 201,
+        "error": ""
+      }
+    },
+    {
+      "file": "tests/mono2.remora",
+      "upstream": {
+        "status": "valid",
+        "ir_bytes": 235,
+        "error": ""
+      },
+      "port": {
+        "status": "valid",
+        "ir_bytes": 201,
+        "error": ""
+      }
+    },
+    {
+      "file": "tests/mono3.remora",
+      "upstream": {
+        "status": "valid",
+        "ir_bytes": 548,
+        "error": ""
+      },
+      "port": {
+        "status": "valid",
+        "ir_bytes": 171,
+        "error": ""
+      }
+    },
+    {
+      "file": "tests/mono4.remora",
+      "upstream": {
+        "status": "valid",
+        "ir_bytes": 534,
+        "error": ""
+      },
+      "port": {
+        "status": "valid",
+        "ir_bytes": 165,
+        "error": ""
+      }
+    },
+    {
+      "file": "tests/mono5.remora",
+      "upstream": {
+        "status": "valid",
+        "ir_bytes": 502,
+        "error": ""
+      },
+      "port": {
+        "status": "valid",
+        "ir_bytes": 104,
+        "error": ""
+      }
+    },
+    {
+      "file": "tests/mono6.remora",
+      "upstream": {
+        "status": "lowering-error",
+        "error": "remora-baseline: compileExp': unhandled lifted apply with func array:\n((frame [2] lam_mono_165 lam_mono_171) 5)\n\nCallStack (from HasCallStack):\n  error, called at src/Futhark.hs:66:7 in main:Futhark\nHasCallStack backtrace:\n  collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:169:13 in ghc-internal:GHC.Internal.Exception\n  toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:204:5 in ghc-internal:GHC.Internal.Exception\n  error, called at src/Futhark.hs:66:7 in main:Futhark"
+      },
+      "port": {
+        "status": "lowering-error",
+        "error": "Futhark: only monomorphic first-order values can be lowered"
+      }
+    },
+    {
+      "file": "tests/mono7.remora",
+      "upstream": {
+        "status": "valid",
+        "ir_bytes": 1380,
+        "error": ""
+      },
+      "port": {
+        "status": "valid",
+        "ir_bytes": 148,
+        "error": ""
+      }
+    },
+    {
+      "file": "tests/mono8.remora",
+      "upstream": {
+        "status": "lowering-error",
+        "error": "remora-baseline: defunBind: unsupported index abstraction:\n(lam_mono_157 (@q_160)\n  (let ((lam_mono_161 ((x_166 [Int @q_160]))\n          (let ((lam_162 ((xs_163 [Int @q_160])) (sum_81 xs_163)))\n            (lam_162 x_166))))\n    lam_mono_161))\n\nCallStack (from HasCallStack):\n  error, called at src/Defunctionalize.hs:83:7 in main:Defunctionalize\nHasCallStack backtrace:\n  collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:169:13 in ghc-internal:GHC.Internal.Exception\n  toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:204:5 in ghc-internal:GHC.Internal.Exception\n  error, called at src/Defunctionalize.hs:83:7 in main:Defunctionalize"
+      },
+      "port": {
+        "status": "lowering-error",
+        "error": "Futhark: existential values are unsupported upstream"
+      }
+    },
+    {
+      "file": "tests/mono9.remora",
+      "upstream": {
+        "status": "lowering-error",
+        "error": "remora-baseline: defunBind: unsupported index abstraction:\n(lam_mono_159 (@q_163)\n  (let ((lam_mono_164 ((x_171 Int) (x_172 [Int @q_163]))\n          (let ((lam_165 ((k_166 Int) (xs_167 [Int @q_163]))\n                  (+_16 k_166 (sum_81 xs_167))))\n            (lam_165 x_171 x_172))))\n    lam_mono_164))\n\nCallStack (from HasCallStack):\n  error, called at src/Defunctionalize.hs:83:7 in main:Defunctionalize\nHasCallStack backtrace:\n  collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:169:13 in ghc-internal:GHC.Internal.Exception\n  toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:204:5 in ghc-internal:GHC.Internal.Exception\n  error, called at src/Defunctionalize.hs:83:7 in main:Defunctionalize"
+      },
+      "port": {
+        "status": "lowering-error",
+        "error": "Futhark: existential values are unsupported upstream"
+      }
+    },
+    {
+      "file": "tests/noarg0.remora",
+      "upstream": {
+        "status": "valid",
+        "ir_bytes": 753,
+        "error": ""
+      },
+      "port": {
+        "status": "valid",
+        "ir_bytes": 387,
+        "error": ""
+      }
+    },
+    {
+      "file": "tests/rec0.remora",
+      "upstream": {
+        "status": "valid",
+        "ir_bytes": 273,
+        "error": ""
+      },
+      "port": {
+        "status": "valid",
+        "ir_bytes": 174,
+        "error": ""
+      }
+    },
+    {
+      "file": "tests/rec1.remora",
+      "upstream": {
+        "status": "valid",
+        "ir_bytes": 120,
+        "error": ""
+      },
+      "port": {
+        "status": "valid",
+        "ir_bytes": 104,
+        "error": ""
+      }
+    },
+    {
+      "file": "tests/rec2.remora",
+      "upstream": {
+        "status": "valid",
+        "ir_bytes": 578,
+        "error": ""
+      },
+      "port": {
+        "status": "valid",
+        "ir_bytes": 359,
+        "error": ""
+      }
+    },
+    {
+      "file": "tests/rec3.remora",
+      "upstream": {
+        "status": "valid",
+        "ir_bytes": 307,
+        "error": ""
+      },
+      "port": {
+        "status": "valid",
+        "ir_bytes": 265,
+        "error": ""
+      }
+    },
+    {
+      "file": "tests/rec4.remora",
+      "upstream": {
+        "status": "valid",
+        "ir_bytes": 600,
+        "error": ""
+      },
+      "port": {
+        "status": "valid",
+        "ir_bytes": 365,
+        "error": ""
+      }
+    },
+    {
+      "file": "tests/rec5.remora",
+      "upstream": {
+        "status": "valid",
+        "ir_bytes": 325,
+        "error": ""
+      },
+      "port": {
+        "status": "valid",
+        "ir_bytes": 271,
+        "error": ""
+      }
+    },
+    {
+      "file": "tests/rec6.remora",
+      "upstream": {
+        "status": "valid",
+        "ir_bytes": 1332,
+        "error": ""
+      },
+      "port": {
+        "status": "valid",
+        "ir_bytes": 949,
+        "error": ""
+      }
+    },
+    {
+      "file": "tests/rec7.remora",
+      "upstream": {
+        "status": "valid",
+        "ir_bytes": 715,
+        "error": ""
+      },
+      "port": {
+        "status": "valid",
+        "ir_bytes": 580,
+        "error": ""
+      }
+    },
+    {
+      "file": "tests/reduce0.remora",
+      "upstream": {
+        "status": "valid",
+        "ir_bytes": 630,
+        "error": ""
+      },
+      "port": {
+        "status": "valid",
+        "ir_bytes": 452,
+        "error": ""
+      }
+    },
+    {
+      "file": "tests/reduce1.remora",
+      "upstream": {
+        "status": "valid",
+        "ir_bytes": 631,
+        "error": ""
+      },
+      "port": {
+        "status": "valid",
+        "ir_bytes": 468,
+        "error": ""
+      }
+    },
+    {
+      "file": "tests/reduce2.remora",
+      "upstream": {
+        "status": "valid",
+        "ir_bytes": 1197,
+        "error": ""
+      },
+      "port": {
+        "status": "valid",
+        "ir_bytes": 910,
+        "error": ""
+      }
+    },
+    {
+      "file": "tests/reduce3.remora",
+      "upstream": {
+        "status": "valid",
+        "ir_bytes": 630,
+        "error": ""
+      },
+      "port": {
+        "status": "valid",
+        "ir_bytes": 452,
+        "error": ""
+      }
+    },
+    {
+      "file": "tests/reducezero0.remora",
+      "upstream": {
+        "status": "valid",
+        "ir_bytes": 571,
+        "error": ""
+      },
+      "port": {
+        "status": "valid",
+        "ir_bytes": 365,
+        "error": ""
+      }
+    },
+    {
+      "file": "tests/reducezero1.remora",
+      "upstream": {
+        "status": "valid",
+        "ir_bytes": 557,
+        "error": ""
+      },
+      "port": {
+        "status": "valid",
+        "ir_bytes": 356,
+        "error": ""
+      }
+    },
+    {
+      "file": "tests/reify-dim0.remora",
+      "upstream": {
+        "status": "valid",
+        "ir_bytes": 120,
+        "error": ""
+      },
+      "port": {
+        "status": "valid",
+        "ir_bytes": 104,
+        "error": ""
+      }
+    },
+    {
+      "file": "tests/reify-shape0.remora",
+      "upstream": {
+        "status": "lowering-error",
+        "error": "remora-baseline: compileExp': unhandled:\n(unbox ($r_146 x_147 reify-shape_143)\n  x_147)\n\nCallStack (from HasCallStack):\n  error, called at src/Futhark.hs:95:17 in main:Futhark\nHasCallStack backtrace:\n  collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:169:13 in ghc-internal:GHC.Internal.Exception\n  toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:204:5 in ghc-internal:GHC.Internal.Exception\n  error, called at src/Futhark.hs:95:17 in main:Futhark"
+      },
+      "port": {
+        "status": "lowering-error",
+        "error": "Futhark: existential values are unsupported upstream"
+      }
+    },
+    {
+      "file": "tests/reshape0.remora",
+      "upstream": {
+        "status": "valid",
+        "ir_bytes": 339,
+        "error": ""
+      },
+      "port": {
+        "status": "valid",
+        "ir_bytes": 274,
+        "error": ""
+      }
+    },
+    {
+      "file": "tests/reverse0.remora",
+      "upstream": {
+        "status": "valid",
+        "ir_bytes": 494,
+        "error": ""
+      },
+      "port": {
+        "status": "valid",
+        "ir_bytes": 380,
+        "error": ""
+      }
+    },
+    {
+      "file": "tests/reverse1.remora",
+      "upstream": {
+        "status": "valid",
+        "ir_bytes": 823,
+        "error": ""
+      },
+      "port": {
+        "status": "valid",
+        "ir_bytes": 667,
+        "error": ""
+      }
+    },
+    {
+      "file": "tests/reverse2.remora",
+      "upstream": {
+        "status": "valid",
+        "ir_bytes": 1082,
+        "error": ""
+      },
+      "port": {
+        "status": "valid",
+        "ir_bytes": 772,
+        "error": ""
+      }
+    },
+    {
+      "file": "tests/reverse3.remora",
+      "upstream": {
+        "status": "valid",
+        "ir_bytes": 330,
+        "error": ""
+      },
+      "port": {
+        "status": "valid",
+        "ir_bytes": 237,
+        "error": ""
+      }
+    },
+    {
+      "file": "tests/serde/emptyframe0.remora",
+      "upstream": {
+        "status": "valid",
+        "ir_bytes": 329,
+        "error": ""
+      },
+      "port": {
+        "status": "valid",
+        "ir_bytes": 288,
+        "error": ""
+      }
+    },
+    {
+      "file": "tests/serde/forall0.remora",
+      "upstream": {
+        "status": "valid",
+        "ir_bytes": 718,
+        "error": ""
+      },
+      "port": {
+        "status": "valid",
+        "ir_bytes": 417,
+        "error": ""
+      }
+    },
+    {
+      "file": "tests/serde/forall1.remora",
+      "upstream": {
+        "status": "valid",
+        "ir_bytes": 548,
+        "error": ""
+      },
+      "port": {
+        "status": "valid",
+        "ir_bytes": 171,
+        "error": ""
+      }
+    },
+    {
+      "file": "tests/serde/forall2.remora",
+      "upstream": {
+        "status": "valid",
+        "ir_bytes": 582,
+        "error": ""
+      },
+      "port": {
+        "status": "valid",
+        "ir_bytes": 159,
+        "error": ""
+      }
+    },
+    {
+      "file": "tests/serde/forall3.remora",
+      "upstream": {
+        "status": "valid",
+        "ir_bytes": 582,
+        "error": ""
+      },
+      "port": {
+        "status": "valid",
+        "ir_bytes": 159,
+        "error": ""
+      }
+    },
+    {
+      "file": "tests/serde/forall4.remora",
+      "upstream": {
+        "status": "valid",
+        "ir_bytes": 700,
+        "error": ""
+      },
+      "port": {
+        "status": "valid",
+        "ir_bytes": 221,
+        "error": ""
+      }
+    },
+    {
+      "file": "tests/serde/pi0.remora",
+      "upstream": {
+        "status": "valid",
+        "ir_bytes": 163,
+        "error": ""
+      },
+      "port": {
+        "status": "valid",
+        "ir_bytes": 104,
+        "error": ""
+      }
+    },
+    {
+      "file": "tests/sugar0.remora",
+      "upstream": {
+        "status": "valid",
+        "ir_bytes": 235,
+        "error": ""
+      },
+      "port": {
+        "status": "valid",
+        "ir_bytes": 201,
+        "error": ""
+      }
+    },
+    {
+      "file": "tests/sum0.remora",
+      "upstream": {
+        "status": "valid",
+        "ir_bytes": 709,
+        "error": ""
+      },
+      "port": {
+        "status": "valid",
+        "ir_bytes": 363,
+        "error": ""
+      }
+    },
+    {
+      "file": "tests/sum1.remora",
+      "upstream": {
+        "status": "lowering-error",
+        "error": "remora-baseline: compileExp': unhandled:\n(unbox (@s_152 contents_153 (iota_92 (frame [1] n_151)))\n  (sum_81 contents_153))\n\nCallStack (from HasCallStack):\n  error, called at src/Futhark.hs:95:17 in main:Futhark\nHasCallStack backtrace:\n  collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:169:13 in ghc-internal:GHC.Internal.Exception\n  toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:204:5 in ghc-internal:GHC.Internal.Exception\n  error, called at src/Futhark.hs:95:17 in main:Futhark"
+      },
+      "port": {
+        "status": "lowering-error",
+        "error": "Futhark: existential values are unsupported upstream"
+      }
+    },
+    {
+      "file": "tests/tfun0.remora",
+      "upstream": {
+        "status": "valid",
+        "ir_bytes": 582,
+        "error": ""
+      },
+      "port": {
+        "status": "valid",
+        "ir_bytes": 159,
+        "error": ""
+      }
+    },
+    {
+      "file": "tests/tfun1.remora",
+      "upstream": {
+        "status": "valid",
+        "ir_bytes": 582,
+        "error": ""
+      },
+      "port": {
+        "status": "valid",
+        "ir_bytes": 159,
+        "error": ""
+      }
+    },
+    {
+      "file": "tests/tfun2.remora",
+      "upstream": {
+        "status": "valid",
+        "ir_bytes": 548,
+        "error": ""
+      },
+      "port": {
+        "status": "valid",
+        "ir_bytes": 171,
+        "error": ""
+      }
+    },
+    {
+      "file": "tests/tfun3.remora",
+      "upstream": {
+        "status": "valid",
+        "ir_bytes": 163,
+        "error": ""
+      },
+      "port": {
+        "status": "valid",
+        "ir_bytes": 104,
+        "error": ""
+      }
+    },
+    {
+      "file": "tests/tfun4.remora",
+      "upstream": {
+        "status": "valid",
+        "ir_bytes": 582,
+        "error": ""
+      },
+      "port": {
+        "status": "valid",
+        "ir_bytes": 159,
+        "error": ""
+      }
+    },
+    {
+      "file": "tests/tfun5.remora",
+      "upstream": {
+        "status": "valid",
+        "ir_bytes": 424,
+        "error": ""
+      },
+      "port": {
+        "status": "valid",
+        "ir_bytes": 104,
+        "error": ""
+      }
+    },
+    {
+      "file": "tests/transpose.remora",
+      "upstream": {
+        "status": "valid",
+        "ir_bytes": 494,
+        "error": ""
+      },
+      "port": {
+        "status": "valid",
+        "ir_bytes": 416,
+        "error": ""
+      }
+    },
+    {
+      "file": "tests/typecheck0.remora",
+      "upstream": {
+        "status": "lowering-error",
+        "error": "tests/typecheck0.remora:3:2: error:\nIll-typed application:\nParam elem type: Int\nArgument elem type: Bool\nin\n(+_16 #t)"
+      },
+      "port": {
+        "status": "lowering-error",
+        "error": "tests/typecheck0.remora:3:1: Ill-typed application: parameter and argument element types differ"
+      }
+    }
+  ],
+  "growth": {
+    "upstream": [
+      {
+        "depth": 2,
+        "source_bytes": 97,
+        "ast_nodes": 211,
+        "json_bytes": 31681,
+        "ir_bytes": 598
+      },
+      {
+        "depth": 4,
+        "source_bytes": 183,
+        "ast_nodes": 429,
+        "json_bytes": 66127,
+        "ir_bytes": 1150
+      },
+      {
+        "depth": 6,
+        "source_bytes": 269,
+        "ast_nodes": 647,
+        "json_bytes": 100573,
+        "ir_bytes": 1702
+      },
+      {
+        "depth": 8,
+        "source_bytes": 355,
+        "ast_nodes": 865,
+        "json_bytes": 135019,
+        "ir_bytes": 2254
+      },
+      {
+        "depth": 10,
+        "source_bytes": 441,
+        "ast_nodes": 1083,
+        "json_bytes": 169465,
+        "ir_bytes": 2806
+      }
+    ],
+    "port": [
+      {
+        "depth": 2,
+        "source_bytes": 97,
+        "ast_nodes": 223,
+        "json_bytes": 10034,
+        "ir_bytes": 532
+      },
+      {
+        "depth": 4,
+        "source_bytes": 183,
+        "ast_nodes": 457,
+        "json_bytes": 20822,
+        "ir_bytes": 1026
+      },
+      {
+        "depth": 6,
+        "source_bytes": 269,
+        "ast_nodes": 691,
+        "json_bytes": 31610,
+        "ir_bytes": 1520
+      },
+      {
+        "depth": 8,
+        "source_bytes": 355,
+        "ast_nodes": 925,
+        "json_bytes": 42398,
+        "ir_bytes": 2014
+      },
+      {
+        "depth": 10,
+        "source_bytes": 441,
+        "ast_nodes": 1159,
+        "json_bytes": 53186,
+        "ir_bytes": 2508
+      }
+    ],
+    "upstream_local": [
+      {
+        "depth": 2,
+        "source_bytes": 93,
+        "ast_nodes": 211,
+        "json_bytes": 31681,
+        "ir_bytes": 598
+      },
+      {
+        "depth": 4,
+        "source_bytes": 167,
+        "ast_nodes": 429,
+        "json_bytes": 66127,
+        "ir_bytes": 1150
+      },
+      {
+        "depth": 6,
+        "source_bytes": 241,
+        "ast_nodes": 647,
+        "json_bytes": 100573,
+        "ir_bytes": 1702
+      },
+      {
+        "depth": 8,
+        "source_bytes": 315,
+        "ast_nodes": 865,
+        "json_bytes": 135019,
+        "ir_bytes": 2254
+      },
+      {
+        "depth": 10,
+        "source_bytes": 389,
+        "ast_nodes": 1083,
+        "json_bytes": 169465,
+        "ir_bytes": 2806
+      }
+    ],
+    "port_local": [
+      {
+        "depth": 2,
+        "source_bytes": 93,
+        "ast_nodes": 237,
+        "json_bytes": 11653,
+        "ir_bytes": 572
+      },
+      {
+        "depth": 4,
+        "source_bytes": 167,
+        "ast_nodes": 485,
+        "json_bytes": 25042,
+        "ir_bytes": 1114
+      },
+      {
+        "depth": 6,
+        "source_bytes": 241,
+        "ast_nodes": 733,
+        "json_bytes": 39260,
+        "ir_bytes": 1656
+      },
+      {
+        "depth": 8,
+        "source_bytes": 315,
+        "ast_nodes": 981,
+        "json_bytes": 54270,
+        "ir_bytes": 2198
+      },
+      {
+        "depth": 10,
+        "source_bytes": 389,
+        "ast_nodes": 1229,
+        "json_bytes": 70072,
+        "ir_bytes": 2740
+      }
+    ],
+    "upstream_poly": [
+      {
+        "depth": 2,
+        "source_bytes": 145,
+        "ast_nodes": 205,
+        "json_bytes": 31230,
+        "ir_bytes": 811
+      },
+      {
+        "depth": 4,
+        "source_bytes": 289,
+        "ast_nodes": 417,
+        "json_bytes": 66334,
+        "ir_bytes": 1585
+      },
+      {
+        "depth": 6,
+        "source_bytes": 433,
+        "ast_nodes": 629,
+        "json_bytes": 101438,
+        "ir_bytes": 2359
+      },
+      {
+        "depth": 8,
+        "source_bytes": 577,
+        "ast_nodes": 841,
+        "json_bytes": 136542,
+        "ir_bytes": 3133
+      },
+      {
+        "depth": 10,
+        "source_bytes": 721,
+        "ast_nodes": 1053,
+        "json_bytes": 171646,
+        "ir_bytes": 3907
+      }
+    ],
+    "port_poly": [
+      {
+        "depth": 2,
+        "source_bytes": 145,
+        "ast_nodes": 51,
+        "json_bytes": 2420,
+        "ir_bytes": 104
+      },
+      {
+        "depth": 4,
+        "source_bytes": 289,
+        "ast_nodes": 207,
+        "json_bytes": 11666,
+        "ir_bytes": 104
+      },
+      {
+        "depth": 6,
+        "source_bytes": 433,
+        "ast_nodes": 831,
+        "json_bytes": 54114,
+        "ir_bytes": 104
+      },
+      {
+        "depth": 8,
+        "source_bytes": 577,
+        "ast_nodes": 3327,
+        "json_bytes": 246536,
+        "ir_bytes": 104
+      },
+      {
+        "depth": 10,
+        "source_bytes": 721,
+        "ast_nodes": 13311,
+        "json_bytes": 1120625,
+        "ir_bytes": 104
+      }
+    ]
+  },
+  "summary": [
+    {
+      "upstream": "lowering-error",
+      "port": "lowering-error",
+      "count": 21
+    },
+    {
+      "upstream": "valid",
+      "port": "valid",
+      "count": 85
+    }
+  ]
+}
