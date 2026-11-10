@@ -29,6 +29,13 @@ multi-axis computed frame constructors. Nested ordinary frame construction works
 There is no `mlir --run`, C API, GPU pipeline, or optimization framework here.
 The existing Futhark commands retain their behavior.
 
+## Desired output for tensor kernels
+
+The [handwritten target contracts](mlir-targets/README.md) demonstrate matmul and
+padded, strided convolution with bias/activation. They verify and execute today,
+but the Remora emitter does not generate them yet. They guide the next lowering
+work and keep explicit primitives compatible with later pattern recognition.
+
 ## Validation
 
 Normal CI checks emission, rejection, and interpreter fixture results:
