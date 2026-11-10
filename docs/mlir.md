@@ -22,7 +22,11 @@ The important step is preserving the distinction between a function's cell and
 its lifted frame. A call of a vector-cell function across rows is lowered in that
 outer frame, with invariant arguments broadcast into it. Internal operations
 then see the whole tensor. We inline these lifted array-cell helpers during
-lowering; ordinary calls still share `func.call` helpers.
+lowering. Ordinary calls can share `func.call` helpers; a helper that only
+returns views of its arguments can keep those projections without allocating.
+Broadcasts carry the source and its axes until a consumer needs a real tensor.
+Indexing drops repeated axes from the address, and Linalg maps compose with
+these views directly.
 
 For example, ordinary matmul contains nested applications of dot; dot itself
 multiplies vectors and reduces them. These become parallel maps plus a structured
@@ -41,7 +45,7 @@ recognize convolution directly or prove that intermediates always disappear.
 | --- | --- |
 | Static literals/empty arrays, local/global values | Constants, tensors, SSA, shared accessors |
 | Scalar arithmetic, comparisons, conversions, exp/log/sqrt/tanh/power | `arith`, `math`, scalar `linalg.generic` maps |
-| Rank lifting and prefix extension | Principal-frame lowering, explicit broadcast maps |
+| Rank lifting and prefix extension | Principal-frame lowering, logical broadcast views, explicit input maps |
 | Transpose, reshape/flatten, append | Permutation maps, `tensor.reshape`, `tensor.concat` |
 | Index/index2d/head/length, static iota, computed one-axis frames | Indexed linalg construction and extraction |
 | Integer sum | Structured reduction over the cell axes |
@@ -140,6 +144,11 @@ defaults: some isolated workloads regress. Both the runner and
 `scripts/profile_yolo_pieces.py` accept repeated compiler flags. The report
 includes the numerical checks, counterexamples to blanket fusion, and remaining
 pooling/window-representation work.
+
+The [broadcast-view follow-up](../validation/mlir-broadcast-views.md) removes
+large repeated input tensors and brings the matched tiled YOLO run from about
+1.03 s to 0.85 s on the same machine. The same change works for ordinary sliding
+sums. It leaves the remaining integer-window construction as a separate task.
 
 ## Limits and further work
 

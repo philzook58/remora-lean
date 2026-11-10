@@ -13,6 +13,11 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 EXE = ROOT / '.lake/build/bin/remora'
 CASES = [
+    ('empty_view_div', '(let ((fun (rep0 (x Int)) ((fn ((i Int)) x) (array [0] Int)))) (/ (rep0 1) (rep0 0)))', [0], [], 'i64'),
+    ('sliding_sum', '(let ((val xs [1.0 2.0 3.0 4.0 5.0 6.0]) (fun (window (offset Int)) (@reduce/zero (Float) (3 []) f.+ 0.0 (@index (Float) (6) xs (+ offset (i-app iota/static [3])))))) (window (i-app iota/static [4])))', [4], [6.0,9.0,12.0,15.0], 'f32'),
+    ('view_return', '((fn ((x [Int 2])) ((fn ((n Int)) x) (i-app iota/static [3]))) [4 5])', [3,2], [4,5,4,5,4,5], 'i64'),
+    ('view_reshape', '(@reshape (Int) ([3 2] [6]) ((fn ((x [Int 2])) ((fn ((n Int)) x) (i-app iota/static [3]))) [4 5]))', [6], [4,5,4,5,4,5], 'i64'),
+    ('view_transpose', '(@transpose2d (Int) (3 2) ((fn ((x [Int 2])) ((fn ((n Int)) x) (i-app iota/static [3]))) [4 5]))', [2,3], [4,4,4,5,5,5], 'i64'),
     ('record_index_cells', '(let ((type &row {(a [Int 2])})) (field (@index (&row) (2) {(a [2] [[1 2] [3 4]])} [1 0]) a))', [2,2], [3,4,1,2], 'i64'),
     ('framed_index2d', '(@index2d (Int) (2 2) [[[1 2] [3 4]] [[5 6] [7 8]]] [[[0 1] [1 0]] [[1 1] [0 0]]])', [2,2], [2,3,8,5], 'i64'),
     ('index_grid', '(@index (Int) (3) [10 20 30] [[0 2] [1 0]])', [2,2], [10,30,20,10], 'i64'),

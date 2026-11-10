@@ -30,6 +30,8 @@ captured tensor does not. [pool-window.mlir](pool-window.mlir) is an equivalent
 `scripts/check_mlir_fusion.py --tools /path/to/iree/bin` in the validation Python
 environment. See the [measured experiments](../../validation/mlir-options-fusion.md).
 The window target is handwritten, rather than current compiler output.
+The checker also emits and executes [ordinary Remora sliding sum](sliding-sum.remora)
+to exercise broadcast views independently of pooling.
 
 ## Semantic target
 

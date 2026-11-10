@@ -29,6 +29,10 @@ structure Builder where
   functions : List String := []
   globals : List (VName × List Ty) := []
   definitions : List (VName × (List Pat × Exp)) := []
+  -- Logical broadcasts project coordinates into a real SSA tensor or scalar.
+  views : List (String × (Value × List Nat)) := []
+  -- Pure argument-view results can cross helper calls without allocating.
+  viewFunctions : List (String × List (Nat × List Nat)) := []
   -- Additional prefix while lowering a rank-lifted array-cell helper in place.
   frame : List Int := []
 abbrev M := StateT Builder (Except String)
@@ -70,36 +74,165 @@ private def scalarOp (name : VName) (xs : List Value) (out : Ty) : M Value := do
     emit out s!"{op} {names xs} : {out}"
   else
     emit out s!"func.call {symbol name}({names xs}) : ({signature xs}) -> {out}"
-private def mapped (out : Ty) (xs : List Value) (f : List Value → M Value) : M Value := do
+private partial def types (t : ArrayType VName) : Except String (List Ty) := do
+  match t.atom with
+  | .record fs =>
+    let ds ← shape t.shape
+    return (← fs.toList.mapM fun (_,t) => do
+      return (← types t).map fun t => {t with dims := ds ++ t.dims}).flatten
+  | _ => return [← typeOf t]
+private def one (xs : List α) : M α :=
+  match xs with | [x] => pure x | _ => throw "expected one primitive component"
+private def emitResults (ts : List Ty) (rhs : String) : M (List Value) := do
+  let vs ← ts.mapM fun t => return Value.mk (← fresh) t
+  line s!"{names vs} = {rhs}"
+  return vs
+private def returnTypes (ts : List Ty) :=
+  if ts.length == 1 then toString ts.head! else
+    "(" ++ String.intercalate ", " (ts.map toString) ++ ")"
+private def indexConstant (n : Int) : M Value := emit ⟨"index",[]⟩ s!"arith.constant {n} : index"
+private def asIndex (v : Value) : M Value :=
+  if v.ty.base == "index" then pure v else
+    emit ⟨"index",[]⟩ s!"arith.index_cast {v.name} : {v.ty} to index"
+private def storage (x : Value) : M (Value × List Nat) := do
+  return ((← get).views.lookup x.name).getD (x,List.range x.ty.dims.length)
+private def project (x : Value) (t : Ty) (axes : List Nat) : M Value := do
+  if x.ty == t && axes == List.range x.ty.dims.length then return x
+  let (source,oldAxes) ← storage x
+  if t.dims.isEmpty && source.ty.dims.isEmpty then return source
+  let name ← fresh
+  let axes := oldAxes.map fun i => axes[i]!
+  modify fun s => {s with views := (name,(source,axes)) :: s.views}
+  return ⟨name,t⟩
+private def extract (x : Value) (indices : List Value) : M Value := do
+  let (source,axes) ← storage x
+  if source.ty.dims.isEmpty then return source
+  let indices := axes.map fun i => indices[i]!
+  emit ⟨source.ty.base,[]⟩
+    s!"tensor.extract {source.name}[{names indices}] : {source.ty}"
+-- Index-driven array construction stays in linalg, so downstream tensor compilers
+-- can schedule it along with arithmetic maps and reductions.
+private def generate (t : Ty) (f : List Value → M Value) : M Value := do
+  if t.dims.isEmpty then return ← f []
+  let dest ← emit t s!"tensor.empty() : {t}"
+  let name ← fresh
+  let iters := String.intercalate ", " (t.dims.map fun _ => "\"parallel\"")
+  line <| s!"{name} = linalg.generic \{indexing_maps = [{affine t.dims.length (List.range t.dims.length)}], " ++
+    s!"iterator_types = [{iters}]} outs({dest.name} : {t}) \{"
+  let unused ← fresh
+  line s!"^bb0({unused}: {t.base}):"
+  let indices ← (List.range t.dims.length).mapM fun i =>
+    emit ⟨"index",[]⟩ s!"linalg.index {i} : index"
+  let value ← f indices
+  line s!"linalg.yield {value.name} : {t.base}"
+  line s!"} -> {t}"
+  return ⟨name,t⟩
+-- Explicit input maps let fusion see through broadcasts and permutations.
+private def mappedWithMaps (out : Ty) (xs : List Value) (accesses : List (List String))
+    (f : List Value → M Value) : M Value := do
   if out.dims.isEmpty then return ← f xs
-  let inputs := xs.filter fun x => !x.ty.dims.isEmpty
-  for x in inputs do
-    unless x.ty.dims == out.dims.take x.ty.dims.length do throw "incompatible prefix frames"
+  let sources ← xs.mapM storage
+  let actual := sources.map Prod.fst
+  let inputs := actual.filter fun x => !x.ty.dims.isEmpty
+  let maps := ((sources.zip accesses).filterMap fun ((x,axes),access) =>
+    if x.ty.dims.isEmpty then none else
+      some (accessMap out.dims.length (axes.map fun i => access[i]!))) ++
+    [affine out.dims.length (List.range out.dims.length)]
   let dest ← emit out s!"tensor.empty() : {out}"
   let result ← fresh
-  let maps := (inputs.map fun x => affine out.dims.length (List.range x.ty.dims.length)) ++
-    [affine out.dims.length (List.range out.dims.length)]
   let iters := String.intercalate ", " (out.dims.map fun _ => "\"parallel\"")
+  let ins := if inputs.isEmpty then "" else s!"ins({names inputs} : {signature inputs}) "
   line <| s!"{result} = linalg.generic \{indexing_maps = [{String.intercalate ", " maps}], " ++
-    s!"iterator_types = [{iters}]} ins({names inputs} : {signature inputs}) " ++
-    s!"outs({dest.name} : {out}) \{"
+    s!"iterator_types = [{iters}]} {ins}outs({dest.name} : {out}) \{"
   let args ← inputs.mapM fun x => return Value.mk (← fresh) ⟨x.ty.base,[]⟩
   let unused ← fresh
   line ("^bb0(" ++ String.intercalate ", " ((args.map fun x => s!"{x.name}: {x.ty}") ++
     [s!"{unused}: {out.base}"]) ++ "):")
   let mut remaining := args
   let mut operands := []
-  for x in xs do
+  for x in actual do
     if x.ty.dims.isEmpty then operands := operands ++ [x]
     else
       let a::rest := remaining | throw "missing region operand"
-      operands := operands ++ [a]
       remaining := rest
+      operands := operands ++ [a]
   let value ← f operands
   line s!"linalg.yield {value.name} : {out.base}"
   line s!"} -> {out}"
   return ⟨result,out⟩
+private def mappedAt (out : Ty) (xs : List Value) (axes : List (List Nat))
+    (f : List Value → M Value) : M Value :=
+  mappedWithMaps out xs (axes.map fun axes => axes.map fun i => s!"d{i}") f
+private def mapped (out : Ty) (xs : List Value) (f : List Value → M Value) : M Value :=
+  mappedAt out xs (xs.map fun x => List.range x.ty.dims.length) f
+-- Materialize only at boundaries that require an ordinary SSA tensor.
+private def materialize (x : Value) : M Value := do
+  if ((← get).views.lookup x.name).isNone then return x
+  mapped x.ty [x] one
+private def reshape (x : Value) (t : Ty) : M Value := do
+  if x.ty == t then return x
+  if t.dims.isEmpty then
+    let zs ← x.ty.dims.mapM fun _ => indexConstant 0
+    return ← extract x zs
+  let x ← materialize x
+  let x ← if x.ty.dims.isEmpty then
+    emit ⟨x.ty.base,[1]⟩ s!"tensor.from_elements {x.name} : tensor<1x{x.ty.base}>"
+    else pure x
+  let st := s!"tensor<{t.dims.length}xi64>"
+  let dims ← fresh
+  let sizes := String.intercalate ", " (t.dims.map toString)
+  line s!"{dims} = arith.constant dense<[{sizes}]> : {st}"
+  emit t s!"tensor.reshape {x.name}({dims}) : ({x.ty}, {st}) -> {t}"
+private def slice (x : Value) (i : Value) : M Value := do
+  let t := {x.ty with dims := x.ty.dims.drop 1}
+  if t.dims.isEmpty then return ← extract x [i]
+  let x ← materialize x
+  let offsets := String.intercalate ", " (i.name :: t.dims.map fun _ => "0")
+  let sizes := String.intercalate ", " ("1" :: t.dims.map toString)
+  let strides := String.intercalate ", " (x.ty.dims.map fun _ => "1")
+  emit t s!"tensor.extract_slice {x.name}[{offsets}] [{sizes}] [{strides}] : {x.ty} to {t}"
+private def insert (dest x : Value) (i : Value) : M Value := do
+  let dest ← materialize dest
+  let x ← materialize x
+  if x.ty.dims.isEmpty then
+    emit dest.ty s!"tensor.insert {x.name} into {dest.name}[{i.name}] : {dest.ty}"
+  else
+    let offsets := String.intercalate ", " (i.name :: x.ty.dims.map fun _ => "0")
+    let sizes := String.intercalate ", " ("1" :: x.ty.dims.map toString)
+    let strides := String.intercalate ", " (dest.ty.dims.map fun _ => "1")
+    emit dest.ty s!"tensor.insert_slice {x.name} into {dest.name}[{offsets}] [{sizes}] [{strides}] : {x.ty} into {dest.ty}"
+private def loop (n start : Int) (initial : List Value)
+    (f : Value → List Value → M (List Value)) : M (List Value) := do
+  let initial ← initial.mapM materialize
+  let lo ← indexConstant start
+  let hi ← indexConstant n
+  let step ← indexConstant 1
+  let i ← fresh
+  let results ← initial.mapM fun x => return Value.mk (← fresh) x.ty
+  let args ← initial.mapM fun x => return Value.mk (← fresh) x.ty
+  let bindings := String.intercalate ", " ((args.zip initial).map fun (a,x) => s!"{a.name} = {x.name}")
+  let ts := String.intercalate ", " (initial.map fun x => toString x.ty)
+  line s!"{names results} = scf.for {i} = {lo.name} to {hi.name} step {step.name} iter_args({bindings}) -> ({ts}) \{"
+  let values ← (← f ⟨i,⟨"index",[]⟩⟩ args).mapM materialize
+  line s!"scf.yield {names values} : {signature values}"
+  line "}"
+  return results
+private partial def mapCells (frame : List Int) (ranks : List Nat)
+    (xs : List (List Value)) (ts : List Ty)
+    (f : List (List Value) → List Ty → M (List Value)) : M (List Value) := do
+  match frame with
+  | [] => f xs ts
+  | d::ds =>
+    let xs ← xs.mapM fun vs => vs.mapM materialize
+    let dest ← ts.mapM fun t => emit t s!"tensor.empty() : {t}"
+    loop d 0 dest fun i acc => do
+      let inputs ← (ranks.zip xs).mapM fun (rank,vs) =>
+        if rank == 0 then pure vs else vs.mapM fun x => slice x i
+      let inner := ts.map fun t => {t with dims := t.dims.drop 1}
+      let out ← mapCells ds (ranks.map (· - 1)) inputs inner f
+      (acc.zip out).mapM fun (dest,x) => insert dest x i
 private def sum (x : Value) (out : Ty) : M Value := do
+  let x ← materialize x
   let tensorOut := "tensor<" ++ String.join (out.dims.map fun n => s!"{n}x") ++ "i64>"
   if x.ty.dims.isEmpty then return x
   let z ← fresh
@@ -121,126 +254,11 @@ private def sum (x : Value) (out : Ty) : M Value := do
   if out.dims.isEmpty then emit out s!"tensor.extract {result}[] : {tensorOut}"
   else return ⟨result,out⟩
 
-private partial def types (t : ArrayType VName) : Except String (List Ty) := do
-  match t.atom with
-  | .record fs =>
-    let ds ← shape t.shape
-    return (← fs.toList.mapM fun (_,t) => do
-      return (← types t).map fun t => {t with dims := ds ++ t.dims}).flatten
-  | _ => return [← typeOf t]
-private def one (xs : List α) : M α :=
-  match xs with | [x] => pure x | _ => throw "expected one primitive component"
-private def emitResults (ts : List Ty) (rhs : String) : M (List Value) := do
-  let vs ← ts.mapM fun t => return Value.mk (← fresh) t
-  line s!"{names vs} = {rhs}"
-  return vs
-private def returnTypes (ts : List Ty) :=
-  if ts.length == 1 then toString ts.head! else
-    "(" ++ String.intercalate ", " (ts.map toString) ++ ")"
-private def indexConstant (n : Int) : M Value := emit ⟨"index",[]⟩ s!"arith.constant {n} : index"
-private def asIndex (v : Value) : M Value :=
-  if v.ty.base == "index" then pure v else
-    emit ⟨"index",[]⟩ s!"arith.index_cast {v.name} : {v.ty} to index"
-private def extract (x : Value) (indices : List Value) : M Value :=
-  if indices.isEmpty then pure x else
-    emit ⟨x.ty.base,[]⟩ s!"tensor.extract {x.name}[{names indices}] : {x.ty}"
--- Index-driven array construction stays in linalg, so downstream tensor compilers
--- can schedule it along with arithmetic maps and reductions.
-private def generate (t : Ty) (f : List Value → M Value) : M Value := do
-  if t.dims.isEmpty then return ← f []
-  let dest ← emit t s!"tensor.empty() : {t}"
-  let name ← fresh
-  let iters := String.intercalate ", " (t.dims.map fun _ => "\"parallel\"")
-  line <| s!"{name} = linalg.generic \{indexing_maps = [{affine t.dims.length (List.range t.dims.length)}], " ++
-    s!"iterator_types = [{iters}]} outs({dest.name} : {t}) \{"
-  let unused ← fresh
-  line s!"^bb0({unused}: {t.base}):"
-  let indices ← (List.range t.dims.length).mapM fun i =>
-    emit ⟨"index",[]⟩ s!"linalg.index {i} : index"
-  let value ← f indices
-  line s!"linalg.yield {value.name} : {t.base}"
-  line s!"} -> {t}"
-  return ⟨name,t⟩
-private def reshape (x : Value) (t : Ty) : M Value := do
-  if x.ty == t then return x
-  if t.dims.isEmpty then
-    let zs ← x.ty.dims.mapM fun _ => indexConstant 0
-    return ← extract x zs
-  let x ← if x.ty.dims.isEmpty then
-    emit ⟨x.ty.base,[1]⟩ s!"tensor.from_elements {x.name} : tensor<1x{x.ty.base}>"
-    else pure x
-  let st := s!"tensor<{t.dims.length}xi64>"
-  let dims ← fresh
-  let sizes := String.intercalate ", " (t.dims.map toString)
-  line s!"{dims} = arith.constant dense<[{sizes}]> : {st}"
-  emit t s!"tensor.reshape {x.name}({dims}) : ({x.ty}, {st}) -> {t}"
-private def slice (x : Value) (i : Value) : M Value := do
-  let t := {x.ty with dims := x.ty.dims.drop 1}
-  if t.dims.isEmpty then return ← extract x [i]
-  let offsets := String.intercalate ", " (i.name :: t.dims.map fun _ => "0")
-  let sizes := String.intercalate ", " ("1" :: t.dims.map toString)
-  let strides := String.intercalate ", " (x.ty.dims.map fun _ => "1")
-  emit t s!"tensor.extract_slice {x.name}[{offsets}] [{sizes}] [{strides}] : {x.ty} to {t}"
-private def insert (dest x : Value) (i : Value) : M Value := do
-  if x.ty.dims.isEmpty then
-    emit dest.ty s!"tensor.insert {x.name} into {dest.name}[{i.name}] : {dest.ty}"
-  else
-    let offsets := String.intercalate ", " (i.name :: x.ty.dims.map fun _ => "0")
-    let sizes := String.intercalate ", " ("1" :: x.ty.dims.map toString)
-    let strides := String.intercalate ", " (dest.ty.dims.map fun _ => "1")
-    emit dest.ty s!"tensor.insert_slice {x.name} into {dest.name}[{offsets}] [{sizes}] [{strides}] : {x.ty} into {dest.ty}"
-private def loop (n start : Int) (initial : List Value)
-    (f : Value → List Value → M (List Value)) : M (List Value) := do
-  let lo ← indexConstant start
-  let hi ← indexConstant n
-  let step ← indexConstant 1
-  let i ← fresh
-  let results ← initial.mapM fun x => return Value.mk (← fresh) x.ty
-  let args ← initial.mapM fun x => return Value.mk (← fresh) x.ty
-  let bindings := String.intercalate ", " ((args.zip initial).map fun (a,x) => s!"{a.name} = {x.name}")
-  let ts := String.intercalate ", " (initial.map fun x => toString x.ty)
-  line s!"{names results} = scf.for {i} = {lo.name} to {hi.name} step {step.name} iter_args({bindings}) -> ({ts}) \{"
-  let values ← f ⟨i,⟨"index",[]⟩⟩ args
-  line s!"scf.yield {names values} : {signature values}"
-  line "}"
-  return results
-private partial def mapCells (frame : List Int) (ranks : List Nat)
-    (xs : List (List Value)) (ts : List Ty)
-    (f : List (List Value) → List Ty → M (List Value)) : M (List Value) := do
-  match frame with
-  | [] => f xs ts
-  | d::ds =>
-    let dest ← ts.mapM fun t => emit t s!"tensor.empty() : {t}"
-    loop d 0 dest fun i acc => do
-      let inputs ← (ranks.zip xs).mapM fun (rank,vs) =>
-        if rank == 0 then pure vs else vs.mapM fun x => slice x i
-      let inner := ts.map fun t => {t with dims := t.dims.drop 1}
-      let out ← mapCells ds (ranks.map (· - 1)) inputs inner f
-      (acc.zip out).mapM fun (dest,x) => insert dest x i
--- Explicit input maps let fusion see through broadcasts and permutations.
-private def mappedWithMaps (out : Ty) (xs : List Value) (inputMaps : List String)
-    (f : List Value → M Value) : M Value := do
-  let dest ← emit out s!"tensor.empty() : {out}"
-  let result ← fresh
-  let maps := inputMaps ++ [affine out.dims.length (List.range out.dims.length)]
-  let iters := String.intercalate ", " (out.dims.map fun _ => "\"parallel\"")
-  line <| s!"{result} = linalg.generic \{indexing_maps = [{String.intercalate ", " maps}], " ++
-    s!"iterator_types = [{iters}]} ins({names xs} : {signature xs}) outs({dest.name} : {out}) \{"
-  let args ← xs.mapM fun x => return Value.mk (← fresh) ⟨x.ty.base,[]⟩
-  let unused ← fresh
-  line ("^bb0(" ++ String.intercalate ", " ((args.map fun x => s!"{x.name}: {x.ty}") ++ [s!"{unused}: {out.base}"]) ++ "):")
-  let value ← f args
-  line s!"linalg.yield {value.name} : {out.base}"
-  line s!"} -> {out}"
-  return ⟨result,out⟩
-private def mappedAt (out : Ty) (xs : List Value) (axes : List (List Nat))
-    (f : List Value → M Value) : M Value :=
-  mappedWithMaps out xs (axes.map (affine out.dims.length)) f
 private def broadcast (x : Value) (t : Ty) (sourceFrame targetFrame : Nat) : M Value := do
   if x.ty == t then return x
-  if x.ty.dims.isEmpty then return ← generate t fun _ => pure x
-  let axes := List.range sourceFrame ++ (List.range (x.ty.dims.length-sourceFrame)).map (· + targetFrame)
-  mappedAt t [x] [axes] fun vs => one vs
+  let axes := List.range sourceFrame ++
+    (List.range (x.ty.dims.length-sourceFrame)).map (· + targetFrame)
+  project x t axes
 private def principal (frames : List (List Int)) : M (List Int) := do
   let frame := frames.foldl (fun a b => if a.length < b.length then b else a) []
   unless frames.all (fun f => f == frame.take f.length) do throw s!"incompatible prefix frames {frames}"
@@ -255,6 +273,10 @@ private def appArgs : Exp → Exp × List Exp × List (ArrayType VName)
 mutual
 private partial def applyName (name : VName) (xs : List (List Value))
     (ts : List Ty) : M (List Value) := do
+  if let some results := (← get).viewFunctions.lookup (symbol name) then
+    let flat := xs.flatten
+    return ← (results.zip ts).mapM fun ((i,axes),t) => project flat[i]! t axes
+  let xs ← xs.mapM fun vs => vs.mapM materialize
   let flat := xs.flatten
   if name.varTag >= intrinsicTypes.length then
     return ← emitResults ts s!"func.call {symbol name}({names flat}) : ({signature flat}) -> {returnTypes ts}"
@@ -347,7 +369,7 @@ private partial def reduction (name : VName) (args : List Exp)
     let n := cell.headD 0
     if name.varName == "reduce" && n == 0 then throw "empty nonzero reduction"
     let inputTy := {input.ty with dims := frame ++ cell}
-    let input ← broadcast input inputTy inputFrame frame.length
+    let input ← materialize (← broadcast input inputTy inputFrame frame.length)
     let out ← one ts
     let tensorOut := "tensor<" ++ String.join (out.dims.map fun n => s!"{n}x") ++ out.base ++ ">"
     let initial ← if name.varName == "reduce/zero" then do
@@ -361,6 +383,7 @@ private partial def reduction (name : VName) (args : List Exp)
           else if out.base == "f32" then "0.0" else "0"
         let v ← emit ⟨out.base,[]⟩ s!"arith.constant {identity} : {out.base}"
         broadcast v out 0 out.dims.length
+    let initial ← materialize initial
     let init ← if out.dims.isEmpty then do
         let v ← fresh
         line s!"{v} = tensor.from_elements {initial.name} : {tensorOut}"
@@ -428,7 +451,7 @@ private partial def application (e : Exp) (ts : List Ty) : M (List Value) := do
       let xs ← ((values.zip ranks).zip ps).mapM fun ((vs,r),p) => do
         let x ← one vs
         let cell ← liftM (shape p.shape)
-        broadcast x {x.ty with dims := frame ++ cell} r frame.length
+        materialize (← broadcast x {x.ty with dims := frame ++ cell} r frame.length)
       let a := xs[0]!
       let b := xs[1]!
       let out ← one ts
@@ -443,9 +466,8 @@ private partial def application (e : Exp) (ts : List Ty) : M (List Value) := do
         let idx ← one values[1]!
         let coordAxes := (List.range ranks[1]!).map fun i => s!"d{i}"
         let maps := if name.varName == "index" then
-            [accessMap out.dims.length coordAxes]
-          else [accessMap out.dims.length (coordAxes ++ ["0"]),
-                accessMap out.dims.length (coordAxes ++ ["1"])]
+            [coordAxes]
+          else [coordAxes ++ ["0"], coordAxes ++ ["1"]]
         let inputs := maps.map fun _ => idx
         return [← mappedWithMaps out inputs maps fun components => do
           let coordinates ← (List.range ranks.head!).mapM fun i =>
@@ -583,7 +605,8 @@ end
 private def function (name : String) (ps : List Pat) (body : Exp) (exported := false) : M Unit := do
   let old := (← get).env
   let oldLines := (← get).lines
-  modify fun s => {s with env := [], lines := []}
+  let oldViews := (← get).views
+  modify fun s => {s with env := [], lines := [], views := []}
   let mut params := []
   for p in ps do
     let ts ← liftM (types (patType p))
@@ -591,13 +614,19 @@ private def function (name : String) (ps : List Pat) (body : Exp) (exported := f
     bind (patVar p) xs
     params := params ++ xs
   let result ← expression body
+  let aliases ← result.mapM fun x => do
+    let (source,axes) ← storage x
+    return (params.zipIdx.find? fun (p,_) => p.name == source.name).map fun (_,i) => (i,axes)
+  if aliases.all Option.isSome then
+    modify fun s => {s with viewFunctions := (name,aliases.filterMap id) :: s.viewFunctions}
+  let result ← result.mapM materialize
   let lines := (← get).lines
   let header := String.intercalate ", " (params.map fun x => s!"{x.name}: {x.ty}")
   let ts := returnTypes (result.map (·.ty))
   let visibility := if exported then "" else "private "
   let text := s!"func.func {visibility}{name}({header}) -> {ts} \{\n" ++
     String.intercalate "\n" lines ++ s!"\nreturn {names result} : {signature result}\n}"
-  modify fun s => {s with env := old, lines := oldLines, functions := s.functions ++ [text]}
+  modify fun s => {s with env := old, lines := oldLines, views := oldViews, functions := s.functions ++ [text]}
 /-- Emit ordinary static-shape Remora, preserving array cells and flattening records. -/
 def compile (p : Prog) : Except String String := do
   unless p.progDecs.any (fun d => match d with | .entry .. => true | _ => false) do

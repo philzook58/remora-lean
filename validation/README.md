@@ -35,3 +35,6 @@ are recorded in [mlir-yolo-profile.md](mlir-yolo-profile.md).
 
 The follow-up [MLIR settings/fusion study](mlir-options-fusion.md) records an
 explicit-index lowering improvement, flag sweeps, and remaining window-access work.
+
+The [broadcast-view study](mlir-broadcast-views.md) reports a general indexing
+change, an independent sliding-sum check, and matched YOLO timings.

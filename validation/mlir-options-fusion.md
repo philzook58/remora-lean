@@ -4,6 +4,8 @@ Follow-up to [the initial profile](mlir-yolo-profile.md), measured 2026-11-10 on
 the same Ryzen CPU and isolated IREE 3.13 environment. Measurements and samples
 are in [mlir-options-fusion.json](mlir-options-fusion.json). The parent compiler
 commit is `a6a613a`; this change exposes index operands explicitly to Linalg.
+The [broadcast-view follow-up](mlir-broadcast-views.md) reports a later improvement
+with the same toolchain.
 
 ## What the settings achieve
 
