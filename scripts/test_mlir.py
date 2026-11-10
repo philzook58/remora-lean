@@ -13,6 +13,28 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 EXE = ROOT / '.lake/build/bin/remora'
 CASES = [
+    ('reducer_capture', '((fn ((n Int)) (@reduce/zero (Int) (2 []) (fn ((a Int) (b Int)) (+ a (+ b n))) 0 [1 2])) [10 20])', [2], [23,43], 'i64'),
+    ('bool_literal', '(bool->i [#t #f])', [2], [1,0], 'i64'),
+    ('framed_record', '(field ((fn ((x Int)) {(a [] x) (b [2] [x x])}) [1 2]) b)', [2,2], [1,1,2,2], 'i64'),
+    ('cell_frame', '((fn ((x Int)) [x (+ x 1)]) [2 4])', [2,2], [2,3,4,5], 'i64'),
+    ('cell_capture', '(let ((fun (f (x [Int 2])) ((fn ((n Int)) (+ x n)) [10 20 30]))) (f [[1 2] [3 4]]))', [2,3,2], [11,12,21,22,31,32,13,14,23,24,33,34], 'i64'),
+    ('framed_transpose', '(@transpose2d (Int) (2 2) [[[1 2] [3 4]] [[5 6] [7 8]]])', [2,2,2], [1,3,2,4,5,7,6,8], 'i64'),
+    ('framed_reduce', '(@reduce/zero (Float) (2 []) f.+ [10.0 20.0] [[1.0 2.0] [3.0 4.0]])', [2], [13.0,27.0], 'f32'),
+    ('empty_float_reduce', '(@reduce/zero (Float) (0 []) f.+ 3.0 (array [0] Float))', [], [3.0], 'f32'),
+    ('fold_left', '(@fold (Int Int) (2 [] []) - 10 [1 2 3])', [], [4], 'i64'),
+    ('fold_right', '(@fold-right (Int Int) (2 [] []) - 10 [1 2 3])', [], [-8], 'i64'),
+    ('bool_float', '(bool->f (f.== [1.0 2.0] 2.0))', [2], [0.0,1.0], 'f32'),
+    ('array_cell', '((fn ((x [Int 2])) (+ x 1)) [[1 2] [3 4]])', [2,2], [2,3,4,5], 'i64'),
+    ('float_reduce', '(@reduce/zero (Float) (3 []) f.+ 0.0 [1.0 2.0 3.0])', [], [6.0], 'f32'),
+    ('vector_reduce', '(@reduce (Float) (1 [2]) (fn ((a [Float 2]) (b [Float 2])) (f.max a b)) [[1.0 4.0] [3.0 2.0]])', [2], [3.0,4.0], 'f32'),
+    ('transpose', '(@transpose2d (Int) (2 3) [[1 2 3] [4 5 6]])', [3,2], [1,4,2,5,3,6], 'i64'),
+    ('reshape', '(@reshape (Int) ([2 3] [3 2]) [[1 2 3] [4 5 6]])', [3,2], [1,2,3,4,5,6], 'i64'),
+    ('index2d', '(@index2d (Int) (2 3) [[1 2 3] [4 5 6]] [[0 2] [1 0]])', [2], [3,4], 'i64'),
+    ('append', '(@append (Int) (2 1 [2]) [[1 2] [3 4]] [[5 6]])', [3,2], [1,2,3,4,5,6], 'i64'),
+    ('iota', '(i-app iota/static [2 3])', [2,3], [0,1,2,3,4,5], 'i64'),
+    ('exp', '(f.exp [0.0 0.0])', [2], [1.0,1.0], 'f32'),
+    ('sqrt', '(f.sqrt [1.0 4.0])', [2], [1.0,2.0], 'f32'),
+    ('record', '(field {(x [2] [1 2]) (y [] 5)} x)', [2], [1,2], 'i64'),
     ('empty', '(+ (array [0] Int) 1)', [0], [], 'i64'),
     ('empty_sum', '(@sum _ ([0]) (array [0] Int))', [], [0], 'i64'),
     ('empty_rows', '(@sum _ ([0]) (array [2 0] Int))', [2], [0,0], 'i64'),
@@ -28,9 +50,10 @@ CASES = [
     ('computed', '[(+ 1 2) (* 2 3)]', [2], [3,6], 'i64'),
     ('computed_rows', '[(+ [1 2] 1) (* [3 4] 2)]', [2,2], [2,3,6,8], 'i64'),
 ]
-PASSES = ('builtin.module(one-shot-bufferize{bufferize-function-boundaries '
-          'function-boundary-type-conversion=identity-layout-map},buffer-deallocation-pipeline,'
+PASSES = ('builtin.module(inline,canonicalize,cse,one-shot-bufferize{bufferize-function-boundaries allow-return-allocs-from-loops '
+          'function-boundary-type-conversion=identity-layout-map},buffer-deallocation-pipeline,convert-bufferization-to-memref,'
           'convert-linalg-to-loops,convert-scf-to-cf,expand-strided-metadata,lower-affine,'
+          'convert-math-to-llvm,convert-math-to-libm,'
           'func.func(llvm-request-c-wrappers),finalize-memref-to-llvm,convert-func-to-llvm,'
           'convert-arith-to-llvm,convert-cf-to-llvm,reconcile-unrealized-casts)')
 
@@ -98,7 +121,7 @@ class EmissionTests(unittest.TestCase):
         self.assertIn('emission only',p.stderr)
 
     def test_rejections(self):
-        for source in ['(fn ((x Int)) x)', '(/ 4 2)', '(+ [1 2 3] [[1 2] [3 4]])',
+        for source in ['(fn ((x Int)) x)', '(+ [1 2 3] [[1 2] [3 4]])',
                        '(box (2) [1 2] (Sigma ($n) [Int $n]))']:
             with self.subTest(source=source):
                 p = subprocess.run([EXE,'mlir','-e',source],capture_output=True,text=True)

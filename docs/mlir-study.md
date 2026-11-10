@@ -164,6 +164,11 @@ a specification of the current Mojo system, so it is not used as one here.
 
 ## 6. What this suggests for Remora
 
+The experiment proposed below is now implemented: ordinary Remora matmul and
+YOLOv4 run through IREE. See the [backend guide](mlir.md) and
+[full-network validation](../validation/mlir-yolo.md). The following records the
+reasoning behind that direction.
+
 | Responsibility | Proposed owner for the next experiment |
 | --- | --- |
 | Program meaning, types, and cell/frame agreement | Remora frontend |

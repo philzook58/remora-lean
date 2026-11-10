@@ -26,3 +26,6 @@ The exact-baseline comparison and code-growth measurements are in
 [compiler-audit.md](compiler-audit.md), with per-file results in
 [compiler-audit.json](compiler-audit.json). The growth tests run with
 `python3 -m unittest discover -s scripts`; C execution requires Futhark and `cc`.
+
+Direct MLIR/IREE execution of ordinary Remora YOLOv4, kernel checks, and the
+independent OpenCV comparison are recorded in [mlir-yolo.md](mlir-yolo.md).

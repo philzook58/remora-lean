@@ -1,84 +1,143 @@
-# Experimental direct MLIR backend
+# Direct MLIR backend
 
-Build normally, then emit standard MLIR:
+The Lean compiler now lowers the ordinary Remora YOLOv4 demo to executable MLIR.
+No convolution/matmul primitives were added to Remora. Futhark and VeIR are not
+required. The existing parser, typechecker (including Z3), monomorphization,
+lambda lifting, and defunctionalization feed a standard tensor/linalg emitter.
 
 ```sh
 lake build
 lake exe remora mlir -e '(+ [1 2] [[10 20 30] [40 50 60]])'
-lake exe remora mlir -f tests/basic0.remora
+lake exe remora mlir -f examples/darknet/yolov4.remora > /tmp/yolov4.mlir
 ```
 
-Emission needs no MLIR installation. It uses the existing typechecker (including
-Z3), monomorphization, lambda lifting, and defunctionalization. It does not invoke
-Futhark. Public entry symbols retain source names; internal functions use unique
-tags. Scalars become `i64` or `f32`; non-scalar values become ranked tensors.
+Emission needs no MLIR installation and adds no Lean dependencies. Public entry
+symbols retain source names; helpers are private. Int, Float, and Bool become
+i64, f32, and i1; arrays become ranked tensors. Record fields become parallel
+primitive components, including function arguments/results.
 
-| Supported | Lowering |
+## How ordinary Remora becomes useful tensor IR
+
+The important step is preserving the distinction between a function's cell and
+its lifted frame. A call of a vector-cell function across rows is lowered in that
+outer frame, with invariant arguments broadcast into it. Internal operations
+then see the whole tensor. We inline these lifted array-cell helpers during
+lowering; ordinary calls still share `func.call` helpers.
+
+For example, ordinary matmul contains nested applications of dot; dot itself
+multiplies vectors and reduces them. These become parallel maps plus a structured
+reduction. Broadcasts and transposes carry explicit indexing maps. IREE fuses the
+maps, recognizes a generic contraction with `(m,k)`, `(k,n)`, `(m,n)` indexing,
+and selects its tiled matrix-multiplication pipeline. There is no match on the
+Remora names `dot`, `matmul`, or `conv`.
+
+Convolution remains the source program's im2col plus matrix multiplication.
+Padding, index arrays, gathers, reshapes, pooling, concatenation, upsampling,
+batch normalization, activations, and detection decoding lower through the same
+ordinary operations. This is a working initial representation; it does not yet
+recognize convolution directly or prove that intermediates always disappear.
+
+| Operations | Representation |
 | --- | --- |
-| Static Int/Float arrays, including empty arrays | `arith.constant`, tensor construction/reshape |
-| Computed one-axis frames, including frames of array cells | `tensor.insert` / `tensor.insert_slice` |
-| Local values and known scalar functions, including captured scalar values | SSA values and shared `func.call` helpers |
-| Integer `+`, `-`, `*`; Float `f.+`, `f.-`, `f.*` | `arith` operations |
-| Scalar-function rank lifting and prefix extension | `linalg.generic` with prefix indexing maps |
-| Integer sum, including empty and multidimensional cells | Initialized `linalg.generic` reduction |
+| Static literals/empty arrays, local/global values | Constants, tensors, SSA, shared accessors |
+| Scalar arithmetic, comparisons, conversions, exp/log/sqrt/tanh/power | `arith`, `math`, scalar `linalg.generic` maps |
+| Rank lifting and prefix extension | Principal-frame lowering, explicit broadcast maps |
+| Transpose, reshape/flatten, append | Permutation maps, `tensor.reshape`, `tensor.concat` |
+| Index/index2d/head/length, static iota, computed one-axis frames | Indexed linalg construction and extraction |
+| Integer sum | Structured reduction over the cell axes |
+| `reduce`/`reduce/zero` with builtin add/multiply/float min/max | Structured reduction over the leading cell axis |
+| Pointwise eta expansions of those reducers | The same structured reduction, independent of function name |
+| Other known folds/reducers | Ordered `scf.for` loops, including right-fold order |
 
-The emitter is intentionally limited. It rejects Boolean/record values, residual
-polymorphism, dynamic/existential shapes, runtime function arrays, general
-vector-cell user functions, top-level value declarations, other intrinsics, and
-multi-axis computed frame constructors. Nested ordinary frame construction works.
-There is no `mlir --run`, C API, GPU pipeline, or optimization framework here.
-The existing Futhark commands retain their behavior.
+Associative floating reductions may be reordered by the toolchain. We use native
+f32 arithmetic and math operations without compatibility shims.
 
-## Understanding scheduling and compiler boundaries
+## Run YOLOv4
 
-Start with the [Halide, IREE, and Mojo walkthrough](mlir-study.md). It includes a
-runnable scheduling example and an IREE experiment recognizing generic matrix
-multiplication. No new Remora primitives are introduced.
+Use an isolated Python environment for the external compiler/runtime:
 
-## Desired output for tensor kernels
+```sh
+python3 -m venv /tmp/remora-iree
+/tmp/remora-iree/bin/pip install iree-base-compiler==3.13.0 iree-base-runtime==3.13.1 numpy
+export PATH=/tmp/remora-iree/bin:$PATH
+```
 
-The [handwritten target contracts](mlir-targets/README.md) demonstrate matmul and
-padded, strided convolution with bias/activation. They verify and execute today,
-but the Remora emitter does not generate them yet. They guide the next lowering
-work and keep explicit primitives compatible with later pattern recognition.
+The checked-in image and weights are Git LFS pointers. Supply their actual
+contents; these are the upstream demo assets (about 4 MB and 258 MB):
+
+```sh
+curl -fL https://media.githubusercontent.com/media/remora-lang/remora/main/examples/darknet/input.bin -o /tmp/yolo-input.bin
+curl -fL https://media.githubusercontent.com/media/remora-lang/remora/main/examples/darknet/yolov4.weights -o /tmp/yolov4.weights
+/tmp/remora-iree/bin/python scripts/run_yolo_mlir.py \
+  --image /tmp/yolo-input.bin --weights /tmp/yolov4.weights \
+  --output-dir /tmp/remora-yolo
+```
+
+The runner emits MLIR, compiles for the host CPU, reads the exact exported
+signature, and supplies the image followed by the 541 weight/BN/bias arrays in
+Darknet storage order. It validates file sizes and rejects LFS pointers. Inputs
+are raw RGB CHW float32; there is no resizing/preprocessing in this runner.
+
+Artifacts are `yolov4.mlir`, `yolov4.vmfb`, `detections.npy`, compiler logs, and
+`result.json`. The array contains 22,743 rows of 85 attributes, in the source's
+anchor-major order. JSON uses objectness times class probability and classwise
+NMS, with normalized center-x/center-y/width/height boxes and zero-based COCO
+class IDs. `--module` can reuse a binary compiled for the exact same source.
+
+IREE 3.13 needs `--iree-opt-const-expr-hoisting=false` for this program: its
+constant-hoisting fixed-point pipeline otherwise exceeds its iteration limit.
+The runner supplies that option; ordinary tensor optimization remains enabled.
+
+The [validation record](../validation/mlir-yolo.md) describes the actual run and
+independent OpenCV/Darknet comparison, including tool versions and asset hashes.
 
 ## Validation
 
-Normal CI checks emission, rejection, and interpreter fixture results:
-
 ```sh
+lake test
 python3 -m unittest discover -s scripts
+python3 scripts/test_mlir.py --native --mlir-bin-dir /path/to/working/mlir/bin
+/tmp/remora-iree/bin/python scripts/check_mlir_darknet.py
 ```
 
-CPU verification and execution are explicit and require a working MLIR 22 toolchain:
+The native harness requires MLIR 22's `mlir-opt`, `mlir-runner`, and sibling
+`../lib/libmlir_c_runner_utils.so`. It verifies and executes every result element,
+including array cells, captured tensors, frame construction, records, tensor
+arguments, left/right folds, empty reductions, comparisons, and integer overflow.
+The explicit IREE check executes 12 neural-network examples against the
+interpreter, plus parameterized matrix multiplication and non-symmetric,
+multichannel convolution with padding, stride, and a remainder against NumPy.
+The `conv_remainder.remora` standalone entry uses undefined weights; its operation
+is exercised with real parameter values instead.
+
+To compare the full output against an independent Darknet implementation:
 
 ```sh
-python3 scripts/test_mlir.py --native --mlir-bin-dir /path/to/llvm/build/bin
+/tmp/remora-iree/bin/pip install 'opencv-python-headless<5'
+curl -fL https://raw.githubusercontent.com/AlexeyAB/darknet/master/cfg/yolov4.cfg -o /tmp/yolov4.cfg
+/tmp/remora-iree/bin/python scripts/check_yolo_opencv.py \
+  --config /tmp/yolov4.cfg --image /tmp/yolo-input.bin \
+  --weights /tmp/yolov4.weights --result /tmp/remora-yolo/detections.npy
 ```
 
-The harness requires sibling `mlir-opt` and `mlir-runner` binaries and
-`../lib/libmlir_c_runner_utils.so`. Missing tools are an error. It prints the tool
-version, verifies each module, generates a test-only wrapper checking every result
-element, bufferizes, lowers to LLVM, and executes. Expected values also have
-interpreter checks in normal tests. Integer overflow wraps at 64 bits; floating
-fixtures use exactly representable values. No float compatibility shims are added.
+This compares all attributes, not only selected detections. It reads OpenCV's raw
+convolution heads and decodes them in NumPy because OpenCV's Region layer
+thresholds class scores. OpenCV is only a validation dependency.
 
-Native tests currently cover 15 examples, including prefix extension in both
-operand positions, captures, computed frames, scalar/row/whole-array sums, empty
-outputs, empty reductions, and integer overflow, and a tensor-valued entry argument. The native harness targets Linux
-shared libraries; portability and a general execution interface are future work.
+## Limits and further work
 
-## Design references
+This is an experimental, unverified translation. External MLIR verifies target
+IR, not correspondence with Remora semantics. Shapes must be static. Residual
+polymorphism, dynamic/existential arrays, runtime function arrays, many unrelated
+intrinsics, and multi-axis computed frame constructors remain unsupported.
+Record operations are supported where components can be flattened; general
+record reductions are not implemented. Runtime file IO and tracing are rejected.
+There is no integrated `mlir --run`, general C/Python binding, or tested GPU
+pipeline. Out-of-bounds gathers do not have a Remora runtime error wrapper.
 
-- [full-pipeline](https://github.com/remora-lang/full-pipeline/tree/23e6b75b85150d02aa40da0b10d3682670003325)
-  routes SOACS through Futhark's GPU IR before MLIR. This backend bypasses those
-  fusion/flattening transformations; equivalent performance is not claimed.
-- [mlir-backend](https://github.com/remora-lang/mlir-backend/tree/2fe88f43d618db0a98cbb53e8003afa4b8d58774)
-  supplies the reference for structured tensor/linalg lowering and CPU passes.
-- [VeIR](https://github.com/opencompl/veir/tree/a37a0dc8c1d4c886c9cd39a5339ca1a3f70a28cf)
-  offers Lean IR manipulation and rewriting. The prototype adds no dependency on
-  it: emitting verified standard text currently needs only a small SSA builder.
-  Revisit that choice when there is a concrete Lean-side rewriting requirement.
-
-This is a compiler experiment, not a verified translation. The emitter reuses
-checked Remora annotations; external MLIR verifies the generated target IR.
+The next optimization question is whether direct convolution recognition and
+layout choices improve this representation enough to justify their complexity.
+Start with the existing [scheduling study](mlir-study.md) and
+[handwritten targets](mlir-targets/README.md). These remain useful contracts;
+convolution recognition and optimal scheduling are separate from getting the
+ordinary program to run correctly.

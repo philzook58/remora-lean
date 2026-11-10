@@ -29,9 +29,10 @@ does not invoke the original Haskell Remora implementation.
 
 ## Experimental MLIR backend
 
-A direct Lean emitter supports static arithmetic, scalar-function lifting, prefix
-broadcasting, and integer sums. See [the MLIR guide](docs/mlir.md) for boundaries
-and CPU execution tests. No new Lean dependencies are required.
+The direct Lean backend runs the ordinary Remora YOLOv4 demo through IREE,
+including array-cell lifting, records, indexing, and reductions. It adds no
+Remora primitives or Lean dependencies and does not require Futhark. See
+[the MLIR guide](docs/mlir.md) for the runner, validation, and remaining limits.
 
 ```sh
 lake exe remora mlir -e '(+ [1 2] 10)'
