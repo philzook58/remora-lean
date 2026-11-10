@@ -58,7 +58,7 @@ private partial def testOptions : List String → Test.Options → List System.F
   | x::xs,o,ps => if x.startsWith "--modes=" then testOptions ("--modes"::(x.drop 8).toString::xs) o ps
     else if x.startsWith "-" then throw s!"unknown test option: {x}"
     else testOptions xs o (ps ++ [System.FilePath.mk x])
-private def usage := "Remora (Lean)\nUsage: remora repl | parse | interpret | futhark | dev | test\n  -f FILE, -e EXPR, --entry NAME, --backend=c|cuda, --run\n"
+private def usage := "Remora (Lean)\nUsage: remora repl | parse | interpret | futhark | mlir | dev | test\n  -f FILE, -e EXPR, --entry NAME, --backend=c|cuda, --run\n"
 def main (args : List String) : IO UInt32 := do
   let mode := args.headD "--help"
   if mode == "--help" || mode == "-h" || args.contains "--help" then IO.println usage; return 0
@@ -69,6 +69,8 @@ def main (args : List String) : IO UInt32 := do
     | .ok (o,paths) => return ← Test.runTests paths o
   let parsed := parseOptions args.tail! {}
   let .ok o := parsed | return ← output (parsed.map (fun _ => ""))
+  if mode == "mlir" && (o.run || o.backend.isSome || !o.flags.isEmpty || !o.args.isEmpty) then
+    return ← output (.error "mlir supports emission only; execution uses the test harness" : Except String String)
   let (fname,source) ← match o.file,o.expr with
     | some f,none => pure (f,← IO.FS.readFile f)
     | none,some s => pure (System.FilePath.mk "<expression>",s)
@@ -78,6 +80,7 @@ def main (args : List String) : IO UInt32 := do
     match Parser.parseExp fname source with
     | .error e => return ← output (.error e : Except String String)
     | .ok e =>
+      if mode == "mlir" then return ← output (← Pipeline.compileMLIRExp e)
       if mode == "interpret" then return ← valOutput (← Pipeline.interpretExp e)
       if mode == "futhark" then
         let compiled ← if o.flags.contains "--asts" then do
@@ -108,6 +111,7 @@ def main (args : List String) : IO UInt32 := do
   | .ok p =>
     match mode with
     | "parse" => IO.println (Lean.toJson p).pretty; return 0
+    | "mlir" => output (← Pipeline.compileMLIR p)
     | "interpret" =>
       match o.args.mapM (Interpreter.Value.Parser.parseVal "<argument>") with
       | .error e => return ← output (.error e : Except String String)

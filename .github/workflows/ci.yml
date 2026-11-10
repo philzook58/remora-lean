@@ -14,7 +14,7 @@ jobs:
           build: 'true'
           test: 'true'
           use-mathlib-cache: 'false'
-      - name: Check compiler growth
+      - name: Check compiler growth and MLIR emission
         run: python3 -m unittest discover -s scripts
       - name: Check understanding guide
         run: lake env lean Understanding.lean

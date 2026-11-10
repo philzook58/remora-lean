@@ -27,6 +27,16 @@ The toolchain is pinned to Lean 4.35.0. Lake fetches the pinned Lean Regex libra
 its dependencies. Z3 is required for symbolic shape relations. The Lean implementation
 does not invoke the original Haskell Remora implementation.
 
+## Experimental MLIR backend
+
+A direct Lean emitter supports static arithmetic, scalar-function lifting, prefix
+broadcasting, and integer sums. See [the MLIR guide](docs/mlir.md) for boundaries
+and CPU execution tests. No new Lean dependencies are required.
+
+```sh
+lake exe remora mlir -e '(+ [1 2] 10)'
+```
+
 ## Compiler
 
 Install Futhark and a C compiler:
