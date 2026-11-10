@@ -6,6 +6,11 @@ The port is in progress; the interpreter is covered by the upstream regression c
 while compiler coverage and close correspondence of compiler passes still need work.
 See [PORTING.md](PORTING.md) for differences and outstanding work.
 
+Start with [Understanding.lean](Understanding.lean) for an executable introduction
+to tensors, lifting, quantifiers, and the compiler. The accompanying
+[code map](docs/understanding.md) follows one program through the actual passes.
+After building, run `lake env lean Understanding.lean` or open it in the Lean editor.
+
 ## Build and run
 
 Install Elan, then run:
@@ -56,8 +61,8 @@ lake exe remora test --modes compile --exclude-tags higher-order,existential,nat
 ```
 
 The exclusions retain visibility of the upstream compiler limitations and the native
-Lean numeric behavior checks. The full compiler corpus still has expected and
-unclassified failures; see PORTING.md.
+Lean numeric behavior checks. The full compiler corpus includes unsupported forms
+and negative cases; see the compiler audit below for their classification.
 
 The [compiler audit](validation/compiler-audit.md) compares the exact upstream
 baseline, documents backend-version differences, and measures intermediate code
