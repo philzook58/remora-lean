@@ -54,9 +54,11 @@ private def typeOf (t : ArrayType VName) : Except String Ty := do
 private def symbol (v : VName) := s!"@remora_fn_{v.varTag}"
 private def bind (v : VName) (x : List Value) : M Unit :=
   modify fun s => {s with env := (v,x)::s.env}
-private def affine (rank : Nat) (axes : List Nat) :=
+private def accessMap (rank : Nat) (axes : List String) :=
   "affine_map<(" ++ String.intercalate "," ((List.range rank).map fun i => s!"d{i}") ++
-  ")->(" ++ String.intercalate "," (axes.map fun i => s!"d{i}") ++ ")>"
+  ")->(" ++ String.intercalate "," axes ++ ")>"
+private def affine (rank : Nat) (axes : List Nat) :=
+  accessMap rank (axes.map fun i => s!"d{i}")
 private def signature (xs : List Value) := String.intercalate ", " (xs.map fun x => toString x.ty)
 private def names (xs : List Value) := String.intercalate ", " (xs.map (·.name))
 private def scalarOp (name : VName) (xs : List Value) (out : Ty) : M Value := do
@@ -216,11 +218,11 @@ private partial def mapCells (frame : List Int) (ranks : List Nat)
       let out ← mapCells ds (ranks.map (· - 1)) inputs inner f
       (acc.zip out).mapM fun (dest,x) => insert dest x i
 -- Explicit input maps let fusion see through broadcasts and permutations.
-private def mappedAt (out : Ty) (xs : List Value) (axes : List (List Nat))
+private def mappedWithMaps (out : Ty) (xs : List Value) (inputMaps : List String)
     (f : List Value → M Value) : M Value := do
   let dest ← emit out s!"tensor.empty() : {out}"
   let result ← fresh
-  let maps := axes.map (affine out.dims.length) ++ [affine out.dims.length (List.range out.dims.length)]
+  let maps := inputMaps ++ [affine out.dims.length (List.range out.dims.length)]
   let iters := String.intercalate ", " (out.dims.map fun _ => "\"parallel\"")
   line <| s!"{result} = linalg.generic \{indexing_maps = [{String.intercalate ", " maps}], " ++
     s!"iterator_types = [{iters}]} ins({names xs} : {signature xs}) outs({dest.name} : {out}) \{"
@@ -231,6 +233,9 @@ private def mappedAt (out : Ty) (xs : List Value) (axes : List (List Nat))
   line s!"linalg.yield {value.name} : {out.base}"
   line s!"} -> {out}"
   return ⟨result,out⟩
+private def mappedAt (out : Ty) (xs : List Value) (axes : List (List Nat))
+    (f : List Value → M Value) : M Value :=
+  mappedWithMaps out xs (axes.map (affine out.dims.length)) f
 private def broadcast (x : Value) (t : Ty) (sourceFrame targetFrame : Nat) : M Value := do
   if x.ty == t then return x
   if x.ty.dims.isEmpty then return ← generate t fun _ => pure x
@@ -431,6 +436,23 @@ private partial def application (e : Exp) (ts : List Ty) : M (List Value) := do
     if ["index","index2d","head"].contains name.varName then
       let x ← one values.head!
       let out ← one ts
+      -- Make index producers visible to ordinary Linalg fusion. Coordinate
+      -- pairs use two accesses to the same tensor, at constant columns 0/1.
+      -- Capturing these tensors through tensor.extract prevents that fusion.
+      if name.varName != "head" && ranks[1]! > 0 then
+        let idx ← one values[1]!
+        let coordAxes := (List.range ranks[1]!).map fun i => s!"d{i}"
+        let maps := if name.varName == "index" then
+            [accessMap out.dims.length coordAxes]
+          else [accessMap out.dims.length (coordAxes ++ ["0"]),
+                accessMap out.dims.length (coordAxes ++ ["1"])]
+        let inputs := maps.map fun _ => idx
+        return [← mappedWithMaps out inputs maps fun components => do
+          let coordinates ← (List.range ranks.head!).mapM fun i =>
+            emit ⟨"index",[]⟩ s!"linalg.index {i} : index"
+          let tail ← ((List.range out.dims.length).drop frame.length).mapM fun i =>
+            emit ⟨"index",[]⟩ s!"linalg.index {i} : index"
+          extract x (coordinates ++ (← components.mapM asIndex) ++ tail)]
       return [← generate out fun indices => do
         let mut coordinates := indices.take ranks.head!
         if name.varName == "head" then coordinates := coordinates ++ [← indexConstant 0]

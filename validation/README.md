@@ -32,3 +32,6 @@ independent OpenCV comparison are recorded in [mlir-yolo.md](mlir-yolo.md).
 
 Warmed latency, CPU kernel attribution, and isolated convolution/pooling probes
 are recorded in [mlir-yolo-profile.md](mlir-yolo-profile.md).
+
+The follow-up [MLIR settings/fusion study](mlir-options-fusion.md) records an
+explicit-index lowering improvement, flag sweeps, and remaining window-access work.

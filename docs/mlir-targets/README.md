@@ -21,6 +21,16 @@ The harness reuses the prototype's MLIR-to-LLVM pipeline and wrapper builder.
 It passes tensors into the functions and checks every result element. These two
 checks are separate from the compiler-generated execution suite.
 
+## Fusion and window-access experiments
+
+[index-capture.mlir](index-capture.mlir) and [index-input.mlir](index-input.mlir)
+show why an explicit index operand enables existing Linalg fusion where a
+captured tensor does not. [pool-window.mlir](pool-window.mlir) is an equivalent
+13×13 max-pooling target with affine window accesses. Run their checks with
+`scripts/check_mlir_fusion.py --tools /path/to/iree/bin` in the validation Python
+environment. See the [measured experiments](../../validation/mlir-options-fusion.md).
+The window target is handwritten, rather than current compiler output.
+
 ## Semantic target
 
 | Block | Contract |

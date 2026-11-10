@@ -13,6 +13,9 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 EXE = ROOT / '.lake/build/bin/remora'
 CASES = [
+    ('record_index_cells', '(let ((type &row {(a [Int 2])})) (field (@index (&row) (2) {(a [2] [[1 2] [3 4]])} [1 0]) a))', [2,2], [3,4,1,2], 'i64'),
+    ('framed_index2d', '(@index2d (Int) (2 2) [[[1 2] [3 4]] [[5 6] [7 8]]] [[[0 1] [1 0]] [[1 1] [0 0]]])', [2,2], [2,3,8,5], 'i64'),
+    ('index_grid', '(@index (Int) (3) [10 20 30] [[0 2] [1 0]])', [2,2], [10,30,20,10], 'i64'),
     ('reducer_capture', '((fn ((n Int)) (@reduce/zero (Int) (2 []) (fn ((a Int) (b Int)) (+ a (+ b n))) 0 [1 2])) [10 20])', [2], [23,43], 'i64'),
     ('bool_literal', '(bool->i [#t #f])', [2], [1,0], 'i64'),
     ('framed_record', '(field ((fn ((x Int)) {(a [] x) (b [2] [x x])}) [1 2]) b)', [2,2], [1,1,2,2], 'i64'),

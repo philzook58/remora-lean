@@ -126,12 +126,20 @@ thresholds class scores. OpenCV is only a validation dependency.
 
 ## Profiling and optimization priorities
 
-The [warmed latency and layer/kernel breakdown](../validation/mlir-yolo-profile.md)
-corrects the initial cold timing comparison and isolates the main costs. IREE is
-about 3.1× slower in this warmed CPU run. Large index arrays, broadcasts, and
-window gathers are the first targets; the representative bare matrix product is
-already close to OpenCV. The report includes reusable profiling scripts and a
-controlled convolution-algorithm comparison.
+The [initial warmed latency and layer/kernel breakdown](../validation/mlir-yolo-profile.md)
+identified index arrays, broadcasts, and window gathers as major costs. The
+[settings and representation experiments](../validation/mlir-options-fusion.md)
+then tested existing IREE options and fixed one emitter issue: explicit index
+operands now let standard Linalg fusion remove intermediates. The full network
+improved from about 1.38 s to 1.12 s with default settings, or about 0.95 s with
+the best tested opt-in data-tiling configuration. OpenCV remains faster overall.
+
+For this YOLO experiment, add `--iree-flag=--iree-opt-level=O0` and
+`--iree-flag=--iree-opt-data-tiling=true` to the runner. These are not global
+defaults: some isolated workloads regress. Both the runner and
+`scripts/profile_yolo_pieces.py` accept repeated compiler flags. The report
+includes the numerical checks, counterexamples to blanket fusion, and remaining
+pooling/window-representation work.
 
 ## Limits and further work
 

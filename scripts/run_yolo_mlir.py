@@ -90,7 +90,11 @@ def main():
     parser.add_argument('--compiler', default=shutil.which('iree-compile'))
     parser.add_argument('--module', type=Path, help='reuse an IREE executable for this exact source')
     parser.add_argument('--threshold', type=float, default=0.25)
+    parser.add_argument('--iree-flag', action='append', default=[],
+                        help='extra compiler option; use --iree-flag=--option=value')
     args = parser.parse_args()
+    if args.module and args.iree_flag:
+        parser.error('--iree-flag applies when compiling; omit --module')
     import numpy as np
     import iree.runtime as rt
     out = args.output_dir.expanduser().absolute()
@@ -108,7 +112,7 @@ def main():
         # runtime constants and ordinary tensor optimization still work.
         command([args.compiler, ir, '--iree-hal-target-backends=llvm-cpu',
                  '--iree-llvmcpu-target-cpu=host', '--iree-opt-const-expr-hoisting=false',
-                 '-o', binary], out/'iree.log')
+                 *args.iree_flag, '-o', binary], out/'iree.log')
     compile_seconds = time.monotonic()-start
     shapes = entry_shapes(ir.read_text())
     arguments = inputs(shapes, args.image, args.weights)
@@ -119,7 +123,7 @@ def main():
     if result.shape != (22743, 85) or not np.isfinite(result).all():
         raise RuntimeError(f'Invalid YOLO result: shape={result.shape}, finite={np.isfinite(result).all()}')
     np.save(out/'detections.npy', result)
-    summary = {'arguments': len(arguments), 'shape': list(result.shape),
+    summary = {'iree_flags': args.iree_flag, 'arguments': len(arguments), 'shape': list(result.shape),
                'compile_seconds': compile_seconds, 'run_seconds': run_seconds,
                'detections': detections(result, args.threshold)}
     (out/'result.json').write_text(json.dumps(summary, indent=2)+'\n')

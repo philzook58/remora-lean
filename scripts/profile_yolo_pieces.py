@@ -30,6 +30,8 @@ def main():
     parser.add_argument('--threads', type=int, default=8)
     parser.add_argument('--iterations', type=int, default=7)
     parser.add_argument('--compiler', default=shutil.which('iree-compile'))
+    parser.add_argument('--iree-flag', action='append', default=[],
+                        help='extra compiler option; use --iree-flag=--option=value')
     args = parser.parse_args()
     if not args.compiler or args.threads < 1 or args.iterations < 1:
         parser.error('a compiler and positive thread/iteration counts are required')
@@ -53,7 +55,7 @@ def main():
         subprocess.run([ROOT/'.lake/build/bin/remora','mlir','-f',program], stdout=f, check=True, timeout=120)
     command([args.compiler,ir,'--iree-hal-target-backends=llvm-cpu',
              '--iree-llvmcpu-target-cpu=host','--iree-opt-const-expr-hoisting=false',
-             '-o',binary],out/'iree.log')
+             *args.iree_flag, '-o',binary],out/'iree.log')
     config = rt.Config('local-task')
     vm = rt.VmModule.copy_buffer(config.vm_instance,binary.read_bytes())
     module = rt.load_vm_module(vm,config)
@@ -114,7 +116,7 @@ def main():
              'stride':stride,'timings':{k:summary(v) for k,v in timings.items()}}
         results.append(row)
         print(name,{k:round(summary(v)['median_ms'],3) for k,v in timings.items()},flush=True)
-    (out/'pieces.json').write_text(json.dumps({'threads_per_engine':args.threads,
+    (out/'pieces.json').write_text(json.dumps({'iree_flags':args.iree_flag,'threads_per_engine':args.threads,
                        'iterations':args.iterations,'cases':results},indent=2)+'\n')
 
 

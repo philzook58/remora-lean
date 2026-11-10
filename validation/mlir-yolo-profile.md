@@ -4,6 +4,9 @@ Measured 2026-11-10 on the same Ryzen 7 PRO 7840U and tool environment as the
 [correctness run](mlir-yolo.md). Compiler revision: `f5e418b`. The measurements
 and samples are saved in [mlir-yolo-profile.json](mlir-yolo-profile.json).
 No compiler or Remora source changes were made for this experiment.
+A [later settings/fusion study](mlir-options-fusion.md) implements one small
+lowering improvement and records the resulting timings; the numbers below are
+for the earlier emitter.
 
 ## Warm latency changes the comparison
 
