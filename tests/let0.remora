@@ -1,0 +1,12 @@
+;; let vals
+;; ==
+;; output { 15 }
+(entry (main)
+(let (
+  (val (x : Int) 5)
+  (val (y : Int) 10)
+  (fun (add (x_ Int) (y_ Int) : Int) (+ x_ y_))
+  )
+(add x y)
+)
+)

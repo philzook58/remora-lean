@@ -1,0 +1,22 @@
+;; Native Lean rounding is intentional: no ties-to-even compatibility shim.
+;; ==
+;; tags { native }
+;; entry: rounding
+;; output { 3 }
+(entry (rounding) (round 2.5))
+
+;; Native signed division rounds toward zero.
+;; ==
+;; tags { native }
+;; entry: division
+;; output { -2 }
+(entry (division) (/ -7 3))
+
+;; Captured values survive partial application.
+;; ==
+;; tags { native }
+;; entry: closure
+;; output { 15 }
+(entry (closure)
+  (let ((val a 5))
+    ((fn ((x Int)) (+ a x)) 10)))

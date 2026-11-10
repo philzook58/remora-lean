@@ -1,0 +1,20 @@
+name = "remora"
+version = "0.1.0"
+defaultTargets = ["Remora", "remora"]
+testDriver = "remoraTest"
+
+[[lean_lib]]
+name = "Remora"
+
+[[lean_exe]]
+name = "remora"
+root = "Main"
+
+[[lean_exe]]
+name = "remoraTest"
+root = "Test"
+
+[[require]]
+name = "Regex"
+git = "https://github.com/bergmannjg/regex"
+rev = "5ac3ea900bb985f4e05bf2e676e152a16696b770"

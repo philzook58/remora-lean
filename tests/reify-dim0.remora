@@ -1,0 +1,6 @@
+;; ==
+;; tags { reify }
+;; output { 5 }
+(entry (main)
+  (@reify-dim _ (5))
+)

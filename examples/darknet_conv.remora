@@ -1,0 +1,86 @@
+(def (fun (@replicate (&t) (@f @s) (in [&t @s]) : [&t @f @s])
+    ((array [] (fn ((x [Int])) in)) (i-app iota/static [@f]))))
+
+(def (fun (@pad/2 (&t) ($n $p) (in [&t $n $n])
+                            (zero [&t]) : [&t (+ $n $p $p) (+ $n $p $p)])
+    (let ((val (vert-pad : [&t $p (+ $p $p $n)]) (@replicate (&t) ([$p (+ $p $p $n)] []) zero))
+          (val (hor-pad : [&t $p]) (@replicate (&t) ([$p] []) zero)))
+      (@append (&t) ($p (+ $n $p) [(+ $p $p $n)])
+         vert-pad
+         (@append (&t) ($n $p [(+ $p $p $n)])
+           (@append (&t) ($p (+ $n $p) []) hor-pad (@append (&t) ($n $p []) in hor-pad))
+           vert-pad)))))
+
+(def (i-fun (idxs-of/2 ($m $n) : [Int $m $n 2])
+     ((fn ((i [Int]))
+        ((fn ((j [Int])) [i j]) (i-app iota/static [$n])))
+      (i-app iota/static [$m]))))
+
+(def (fun (@subarray/2 (&t) ($in-out $out)
+                    (in [&t (+ $in-out $out) (+ $in-out $out)])
+                    (offset [Int 2]) : [&t $out $out])
+     (@index2d (&t) ((+ $in-out $out) (+ $in-out $out))
+                    in
+                    (+ (@replicate (Int) ([$out $out] [2]) offset) (i-app idxs-of/2 $out $out)))))
+
+(def (fun (@lifted-subarray/2 (&t) (@s $in-out $out)
+                        (in [&t (+ $in-out $out) (+ $in-out $out)])
+                        (offset [Int @s 2]) : [&t @s $out $out])
+     (@subarray/2 (&t) ($in-out $out) in offset)))
+
+(def (fun (@im2col _ ($n-k $k $p $in-c)
+                  (im [Float $in-c (+ $n-k $k) (+ $n-k $k)])
+                  : [Float (* $in-c $k $k) (* (+ $n-k $p $p 1) (+ $n-k $p $p 1))])
+      (@flatten (Float) ($in-c (* $k $k) [(* (+ $n-k $p $p 1) (+ $n-k $p $p 1))])
+        (@flatten (Float) ($k $k [(* (+ $n-k $p $p 1) (+ $n-k $p $p 1))])
+          (@flatten (Float) ((+ $n-k $p $p 1) (+ $n-k $p $p 1) [])
+             (@lifted-subarray/2 (Float) ([$k $k] (- $k 1) (+ $n-k $p $p 1))
+               (@pad/2 (Float) ((+ $n-k $k) $p) im 0.0)
+                 (@replicate (Int) ([$in-c] [$k $k 2])
+                   (i-app idxs-of/2 $k $k))))))))
+
+
+(def (fun (@dot _ ($n-1) (v [Float (+ 1 $n-1)]) (w [Float (+ 1 $n-1)]) : [Float])
+    (@reduce (Float) ($n-1 []) f.+ (f.* v w))))
+
+(def (fun (@lifted_dot _ ($m-1 $o) (v [Float (+ 1 $m-1)]) (M [Float (+ 1 $m-1) $o]) : [Float $o])
+    (@dot _ ($m-1) v (@transpose2d (Float) ((+ 1 $m-1) $o) M))))
+
+(def (fun (@matmul _ ($n $m-1 $o) (xss [Float $n (+ 1 $m-1)])
+                               (yss [Float (+ 1 $m-1) $o]) : [Float $n $o])
+      (@lifted_dot _ ($m-1 $o) xss yss)))
+
+(def (fun (@conv-2d _ ($n-k $k $in-c $out-c $p)
+                (in [Float $in-c (+ $n-k $k) (+ $n-k $k)])
+                (w  [Float $out-c $in-c $k $k])
+                : [Float $out-c (* (+ $n-k $p $p 1) (+ $n-k $p $p 1))])
+    (@matmul _ ($out-c (- (* $k $k $in-c) 1) (* (+ $n-k $p $p 1) (+ $n-k $p $p 1)))
+             ; matrix out-c x in-c*k*k
+             (@flatten (Float) ($in-c (* $k $k) [])
+                (@flatten (Float) ($k $k []) w))
+             ; out*out x k*k*in-c
+             (@im2col _ ($n-k $k $p $in-c) in))))
+
+;; ==
+;; input {
+;;   [[[0.0  1.0  2.0  3.0]
+;;     [4.0  5.0  6.0  7.0]
+;;     [8.0  9.0  10.0 11.0]
+;;     [12.0 13.0 14.0 15.0]]]
+;;   [[[[1.0 1.0] [1.0 1.0]]]
+;;    [[[0.5 0.5] [0.5 0.5]]]]
+;; }
+;; output {
+;;   [[0.0  1.0  3.0  5.0  3.0
+;;     4.0  10.0 14.0 18.0 10.0
+;;     12.0 26.0 30.0 34.0 18.0
+;;     20.0 42.0 46.0 50.0 26.0
+;;     12.0 25.0 27.0 29.0 15.0]
+;;    [0.0  0.5  1.5  2.5  1.5
+;;     2.0  5.0  7.0  9.0  5.0
+;;     6.0  13.0 15.0 17.0 9.0
+;;     10.0 21.0 23.0 25.0 13.0
+;;     6.0  12.5 13.5 14.5 7.5]]
+;; }
+(entry (main (in [Float 1 4 4]) (w [Float 2 1 2 2]))
+  (@conv-2d _ (2 2 1 2 1) in w))

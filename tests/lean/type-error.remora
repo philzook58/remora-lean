@@ -1,0 +1,5 @@
+;; Regex error matching uses the Lean Regex library directly.
+;; ==
+;; entry: wrongtype
+;; error: Ill-typed.*
+(entry (wrongtype) (+ #t 3))

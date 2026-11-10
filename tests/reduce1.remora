@@ -1,0 +1,13 @@
+;; sum
+;; ==
+;; output { 6.0 }
+(entry (main)
+(let (
+(val (reduce3 : (-> ((A (-> ((A Float (dims)) (A Float (dims))) (A Float (dims))) (dims))
+               (A Float (dims 3)))
+              (A Float (dims))))
+          (i-app (t-app reduce Float) 2 (dims)))
+)
+     (reduce3 f.+ [1.0 2.0 3.0] )
+  )
+)

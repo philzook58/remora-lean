@@ -1,0 +1,12 @@
+;; ==
+;; output { [5 7 9] }
+(entry (main)
+(let (
+  (type &MyInt Int)
+  (ispace $d 3)
+  (type *IntVec3 (A &MyInt $d))
+  (fun (add-int-vec (x *IntVec3) (y *IntVec3) : *IntVec3) (+ x y))
+)
+(add-int-vec [1 2 3] [4 5 6])
+)
+)

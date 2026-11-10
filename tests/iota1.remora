@@ -1,0 +1,5 @@
+;; ==
+;; output { [0 1 2 3 4] }
+(entry (main)
+(i-app iota/static [5])
+)

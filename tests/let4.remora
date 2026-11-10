@@ -1,0 +1,12 @@
+;; ==
+;; output { 15 }
+(entry (main)
+(let (
+  (fun (add (x Int) (y Int) : Int) (+ x y))
+  (fun (mul (x Int) (y Int)) (* x y))
+  (val (x : Int) 1)
+  (val y 2)
+)
+(mul (add x y) 5)
+)
+)

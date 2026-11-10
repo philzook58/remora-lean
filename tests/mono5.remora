@@ -1,0 +1,9 @@
+;; ==
+;; output { 3 }
+(entry (main)
+(let (
+  (t-fun (fst (&t)) (fn ((x &t) (y &t)) x))
+)
+  ((t-app fst Int) 3 4)
+)
+)

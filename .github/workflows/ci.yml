@@ -1,0 +1,16 @@
+name: Lean
+on:
+  push:
+  pull_request:
+jobs:
+  interpreter:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install shape solver
+        run: sudo apt-get update && sudo apt-get install -y z3
+      - uses: leanprover/lean-action@v1
+        with:
+          build: 'true'
+          test: 'true'
+          use-mathlib-cache: 'false'

@@ -1,0 +1,18 @@
+;; dot product
+;; ==
+;; output { 14.0 }
+(entry (main)
+(let (
+(val (reduce3 : (-> ((A (-> ((A Float (dims)) (A Float (dims))) (A Float (dims))) (dims))
+                     (A Float (dims 3)))
+                    (A Float (dims))))
+       (i-app (t-app reduce Float) 2 (dims)))
+(fun (dot3 (x (A Float (dims 3)))
+             (y (A Float (dims 3)))
+            :
+        Float)
+        (reduce3 f.+ (f.* x y)))
+      )
+     (dot3 [1.0 2.0 3.0] [1.0 2.0 3.0])
+  )
+)

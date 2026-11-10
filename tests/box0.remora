@@ -1,0 +1,13 @@
+;; box
+;; ==
+;; tags { existential }
+;; output { [1 2 3] }
+(entry (main)
+(let (
+
+(val (my-box : (Sigma ($d) (A Int (dims $d))))
+  (box (3) [1 2 3] (Sigma ($d) (A Int (dims $d)))))
+)
+(unbox ($d xs my-box) xs)
+)
+)

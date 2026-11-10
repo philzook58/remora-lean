@@ -1,0 +1,11 @@
+;; add two arrays
+;; ==
+;; output { [3 6] }
+(entry (main)
+((fn ((x (A Int (dims 2))) (y (A Int (dims 2))))
+    (+ x y)
+    )
+ [1 2]
+ [2 4]
+ )
+)
