@@ -58,6 +58,29 @@ CASES = [
     ('computed', '[(+ 1 2) (* 2 3)]', [2], [3,6], 'i64'),
     ('computed_rows', '[(+ [1 2] 1) (* [3 4] 2)]', [2,2], [2,3,6,8], 'i64'),
 ]
+RECTANGULAR_POOL = '''(entry (main (image [Float 1 5 7]))
+  ((fn ((channel [Float 5 7]))
+     (let ((val windows
+              ((fn ((dy Int))
+                 ((fn ((dx Int))
+                    ((fn ((oy Int))
+                       ((fn ((ox Int))
+                          (@index2d (Float) (5 7) channel
+                            [(+ (* oy 2) (* dy 2)) (+ (* ox 2) dx)]))
+                        (i-app iota/static [3])))
+                     (i-app iota/static [2])))
+                  (i-app iota/static [3])))
+               (i-app iota/static [2]))))
+       (@reduce/zero (Float) (3 [2 3])
+         (fn ((a [Float 2 3]) (b [Float 2 3])) (f.max a b))
+         ((fn ((i Int)) -10.0) (i-app iota/static [2 3]))
+         (@reduce/zero (Float) (2 [3 2 3])
+           (fn ((a [Float 3 2 3]) (b [Float 3 2 3])) (f.max a b))
+           ((fn ((i Int)) -20.0) (i-app iota/static [3 2 3]))
+           windows))))
+   image))
+'''
+
 PASSES = ('builtin.module(inline,canonicalize,cse,one-shot-bufferize{bufferize-function-boundaries allow-return-allocs-from-loops '
           'function-boundary-type-conversion=identity-layout-map},buffer-deallocation-pipeline,convert-bufferization-to-memref,'
           'convert-linalg-to-loops,convert-scf-to-cf,expand-strided-metadata,lower-affine,'
@@ -127,6 +150,40 @@ class EmissionTests(unittest.TestCase):
         p = subprocess.run([EXE,'mlir','--run','-e','1'],capture_output=True,text=True)
         self.assertNotEqual(p.returncode,0)
         self.assertIn('emission only',p.stderr)
+
+    def test_window_pooling(self):
+        reversed_rows = RECTANGULAR_POOL.replace('(* dy 2)', '(- 2 (* dy 2))')
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / 'pool.remora'
+            source.write_text(RECTANGULAR_POOL)
+            ir = run([EXE, 'mlir', '-f', source])
+            spatial_map = '(d0,d1,d2 * 2 + d4 * 2,d3 * 2 + d5 * 1)'
+            self.assertIn(spatial_map, ir)
+            self.assertIn('"parallel", "reduction", "reduction"', ir)
+            source.write_text(reversed_rows)
+            ir = run([EXE, 'mlir', '-f', source])
+            self.assertNotIn(spatial_map, ir)
+            self.assertIn('arith.maximumf', ir)
+
+    def test_window_contraction(self):
+        definitions = (ROOT / 'examples/darknet/yolov4.remora').read_text().split('(entry', 1)[0]
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / 'conv.remora'
+            source.write_text(definitions + """
+(entry (main (x [Float 2 6 6]) (w [Float 3 2 3 3]))
+  (@conv-2d/rem _ (2 3 2 3 1 2 1) x w))
+""")
+            ir = run([EXE, 'mlir', '--structured-conv', '-f', source])
+            self.assertIn('linalg.conv_2d_nchw_fchw', ir)
+            self.assertIn('strides = dense<[2, 2]>', ir)
+            self.assertNotIn('linalg.conv_2d_nchw_fchw', run([EXE, 'mlir', '-f', source]))
+            source.write_text(definitions + """
+(entry (main (w [Float 3 18]) (x [Float 18 9]))
+  (@matmul _ (3 17 9) w x))
+""")
+            ir = run([EXE, 'mlir', '--structured-conv', '-f', source])
+            self.assertNotIn('linalg.conv_2d_nchw_fchw', ir)
+            self.assertIn('arith.mulf', ir)
 
     def test_rejections(self):
         for source in ['(fn ((x Int)) x)', '(+ [1 2 3] [[1 2] [3 4]])',

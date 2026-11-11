@@ -38,6 +38,22 @@ Remora primitives or Lean dependencies and does not require Futhark. See
 lake exe remora mlir -e '(+ [1 2] 10)'
 ```
 
+## Experimental PyTorch emitter
+
+Print a Python module from the same static tensor lowering used by the MLIR
+backend. Generation uses `iree-base-compiler`. The generated module imports
+only PyTorch and exposes the original entry names in its `entries` dictionary.
+
+```sh
+set -o pipefail
+lake exe remora mlir -e '(+ [1 2] 10)' |
+  python scripts/emit_pytorch.py - > /tmp/remora_example.py
+PYTHONPATH=/tmp python -c 'import remora_example as r; print(r.entries["main"]())'
+```
+
+See [the YOLOv4 comparison](validation/yolo-pytorch.md) for full-model emission,
+reproduction, and supported operations.
+
 ## Compiler
 
 Install Futhark and a C compiler:

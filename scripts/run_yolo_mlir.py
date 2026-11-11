@@ -88,6 +88,7 @@ def main():
     parser.add_argument('--weights', type=Path, required=True, help='Darknet yolov4.weights')
     parser.add_argument('--output-dir', type=Path, default=Path('/tmp/remora-yolo-mlir'))
     parser.add_argument('--compiler', default=shutil.which('iree-compile'))
+    parser.add_argument('--rocm-target', help='Compile and run on HIP, e.g. gfx1103 for Radeon 780M')
     parser.add_argument('--module', type=Path, help='reuse an IREE executable for this exact source')
     parser.add_argument('--threshold', type=float, default=0.25)
     parser.add_argument('--iree-flag', action='append', default=[],
@@ -100,9 +101,12 @@ def main():
     out = args.output_dir.expanduser().absolute()
     out.mkdir(parents=True, exist_ok=True)
     ir, binary = out/'yolov4.mlir', args.module or out/'yolov4.vmfb'
+    driver = 'hip' if args.rocm_target else 'local-task'
+    remora_flags = ['--structured-conv'] if args.rocm_target else []
     start = time.monotonic()
     with ir.open('w') as stream, (out/'remora.log').open('w') as errors:
-        subprocess.run([ROOT/'.lake/build/bin/remora', 'mlir', '-f', args.source.absolute()],
+        subprocess.run([ROOT/'.lake/build/bin/remora', 'mlir', *remora_flags, '-f',
+                        args.source.absolute()],
                        cwd=ROOT, stdout=stream, stderr=errors, check=True, timeout=120)
     if not args.module:
         if not args.compiler:
@@ -110,20 +114,27 @@ def main():
         # IREE 3.13's constant-expression hoisting can fail its fixed-point
         # iteration limit on these index-array expressions. Disable that pass;
         # runtime constants and ordinary tensor optimization still work.
-        command([args.compiler, ir, '--iree-hal-target-backends=llvm-cpu',
-                 '--iree-llvmcpu-target-cpu=host', '--iree-opt-const-expr-hoisting=false',
+        if args.rocm_target:
+            target_flags = ['--iree-hal-target-backends=rocm',
+                            f'--iree-rocm-target={args.rocm_target}']
+        else:
+            target_flags = ['--iree-hal-target-backends=llvm-cpu', '--iree-llvmcpu-target-cpu=host']
+        command([args.compiler, ir, *target_flags, '--iree-opt-const-expr-hoisting=false',
                  *args.iree_flag, '-o', binary], out/'iree.log')
     compile_seconds = time.monotonic()-start
     shapes = entry_shapes(ir.read_text())
     arguments = inputs(shapes, args.image, args.weights)
-    module = rt.load_vm_flatbuffer(binary.read_bytes(), driver='local-task')
+    module = rt.load_vm_flatbuffer(binary.read_bytes(), driver=driver)
     start = time.monotonic()
     result = module.main(*arguments).to_host()
     run_seconds = time.monotonic()-start
     if result.shape != (22743, 85) or not np.isfinite(result).all():
         raise RuntimeError(f'Invalid YOLO result: shape={result.shape}, finite={np.isfinite(result).all()}')
+    if not result.any():
+        raise RuntimeError('Invalid YOLO result: all output attributes are zero')
     np.save(out/'detections.npy', result)
-    summary = {'iree_flags': args.iree_flag, 'arguments': len(arguments), 'shape': list(result.shape),
+    summary = {'driver': driver, 'rocm_target': args.rocm_target, 'iree_flags': args.iree_flag,
+               'arguments': len(arguments), 'shape': list(result.shape),
                'compile_seconds': compile_seconds, 'run_seconds': run_seconds,
                'detections': detections(result, args.threshold)}
     (out/'result.json').write_text(json.dumps(summary, indent=2)+'\n')

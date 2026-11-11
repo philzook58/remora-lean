@@ -9,7 +9,7 @@ from pathlib import Path
 import time
 
 
-def yolo_config(path):
+def config_sections(path):
     sections = []
     for line in path.read_text().splitlines():
         line = line.split('#', 1)[0].strip()
@@ -18,7 +18,11 @@ def yolo_config(path):
         elif '=' in line:
             key, value = line.split('=', 1)
             sections[-1][1][key.strip()] = value.strip()
-    return [fields for kind, fields in sections if kind == 'yolo']
+    return sections
+
+
+def yolo_config(path):
+    return [fields for kind, fields in config_sections(path) if kind == 'yolo']
 
 
 def decode(raw, config, side):

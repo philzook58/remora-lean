@@ -151,3 +151,102 @@ The scripts save all samples and per-layer/kernel results. The optional kernel
 capture also writes a HAL `.ireeprof` bundle and raw JSONL. Without executable
 source dumps, the profiler leaves gather attribution in the broader map category.
 Large dumps, input copies, and binaries stay in `/tmp`, outside the repository.
+
+## CPU follow-up after window recognition
+
+These measurements use eight threads on the Ryzen 7 PRO 7840U, IREE 3.13,
+resident arguments, two warm-ups, and seven alternating timed runs. Every
+variant passed the full-output comparison.
+
+| Full YOLOv4 lowering | Median |
+| --- | ---: |
+| Default Remora MLIR | 976 ms |
+| Default Remora MLIR with data tiling | 735 ms |
+| Recognized convolution converted to im2col | 886 ms |
+| Recognized convolution converted to im2col with data tiling | 670 ms |
+| Winograd where supported, im2col for the other convolutions | 833 ms |
+
+A second run measured tiled im2col at 684 ms. In that run, raising its IREE
+optimization level to O2 gave 723 ms, and adding data tiling to the Winograd
+mix gave 871 ms. In a direct comparison, tiled im2col took 671 ms and OpenCV
+took 456 ms including decoding. Supplying NumPy arguments on every IREE call
+instead of reusing resident arrays increased its median to 799 ms.
+
+The tiled im2col dispatch profile attributed about 51% of aggregate CPU
+worker-tile time to matmul dispatches, 22% to patch construction, 8% to
+copies, and 8% to dispatches containing tanh. These shares measure worker
+time. The executable source for one stride-two layer writes a
+`32×3×3×304×304` float32 patch tensor, about 102 MiB, in a separate dispatch
+before its matmul. The identifiable patch stores represent about 949 MiB
+of logical writes per inference, before counting their reads or any extra
+packing traffic.
+
+To reproduce the tiled im2col path using the tool versions above:
+
+```sh
+lake exe remora mlir --structured-conv -f examples/darknet/yolov4.remora > /tmp/yolo-conv.mlir
+iree-opt --inline --canonicalize --cse --symbol-dce \
+  --iree-global-opt-convert-conv2d-to-img2col /tmp/yolo-conv.mlir > /tmp/yolo-im2col.mlir
+iree-compile /tmp/yolo-im2col.mlir --iree-hal-target-backends=llvm-cpu \
+  --iree-llvmcpu-target-cpu=host --iree-opt-const-expr-hoisting=false \
+  --iree-opt-level=O0 --iree-opt-data-tiling=true \
+  --iree-hal-dump-executable-sources-to=/tmp/yolo-im2col-sources -o /tmp/yolo-im2col.vmfb
+```
+
+Pass the VMFB, original MLIR signature, and executable source directory to
+`scripts/profile_yolo_mlir.py --profile-kernels` as in the example above.
+
+### Direct convolution microkernels
+
+The fastest configuration kept the recognized convolution and selected IREE's
+experimental convolution data tiling with CPU microkernels. In a paired
+eight-thread comparison, the same direct-convolution tiling took 5,593 ms
+with default microkernel selection and 533 ms with
+`--iree-llvmcpu-enable-ukernels=all`. Tiled im2col took 685 ms in that run.
+The two direct variants agreed with the reference within 0.000015 maximum
+absolute error. The compiler was IREE `3.13.0rc20261016`.
+
+In a separate alternating head-to-head run, direct convolution with
+microkernels took 543 ms and OpenCV took 454 ms including decoding. Reusing
+resident IREE inputs saved about 130 ms compared with supplying host arrays
+on each call. The worker profile attributed 55% of aggregate worker-tile time
+to direct convolution and pooling, 11% to matmul, 11% to dispatches containing
+tanh, and 9% to copies. No rank-five im2col patch stores matched the profiler's
+patch category on this path.
+
+Compile the original structured-convolution MLIR directly for this experiment:
+
+```sh
+iree-compile /tmp/yolo-conv.mlir --iree-hal-target-backends=llvm-cpu \
+  --iree-llvmcpu-target-cpu=host --iree-opt-const-expr-hoisting=false \
+  --iree-opt-level=O0 --iree-dispatch-creation-data-tiling=true \
+  --iree-dispatch-creation-experimental-set-data-tiling-ops=matmul \
+  --iree-dispatch-creation-experimental-set-data-tiling-ops=scaled_matmul \
+  --iree-dispatch-creation-experimental-set-data-tiling-ops=convolution \
+  --iree-llvmcpu-enable-ukernels=all \
+  --iree-hal-dump-executable-sources-to=/tmp/yolo-direct-sources -o /tmp/yolo-direct.vmfb
+```
+
+## Radeon 780M OpenCV comparison
+
+OpenCV 4.14 exposed the Radeon through AMD's ROCm OpenCL ICD using a
+process-local loader configuration. The benchmark set OpenCV's DNN target
+to `DNN_TARGET_OPENCL` in FP32 and confirmed `gfx1103` as the selected
+OpenCL device. OpenCV logged shader compilation errors, so this measures
+its OpenCL path with possible CPU fallback for individual operations.
+
+| Full YOLOv4, same image and weights | Median |
+| --- | ---: |
+| OpenCV CPU, eight threads | 446 ms |
+| IREE HIP, resident inputs | 1,347 ms |
+| OpenCV with Radeon OpenCL selected | 1,810 ms |
+
+The benchmark alternated order across seven warmed trials and checked each
+decoded output against the same CPU reference. Time includes output readback
+and decoding.
+
+The temporary ICD file contained `/opt/rocm/lib/opencl/libamdocl64.so`.
+Setting `OCL_ICD_VENDORS` to that file's directory,
+`OCL_ICD_FILENAMES` to the library path, and
+`LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu` selected the system OpenCL
+loader and exposed the Radeon for the benchmark process.

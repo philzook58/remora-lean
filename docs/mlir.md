@@ -41,6 +41,34 @@ batch normalization, activations, and detection decoding lower through the same
 ordinary operations. This is a working initial representation; it does not yet
 recognize convolution directly or prove that intermediates always disappear.
 
+Max-pool recognition follows `index2d` and two max reductions back to the source
+tensor. The lowering keeps symbolic coordinates for static iota, index
+arithmetic, and coordinate pairs. A Lean matcher checks that the channel index
+is unchanged, that each spatial coordinate is a stride times an output
+coordinate plus a dilation times a window coordinate, and that the resulting
+window fits the output shape. The original padded input and reduction
+initializers are preserved. If a check fails, the ordinary gather and
+reductions are used.
+
+The successful case emits one affine Linalg reduction over the source tensor.
+This avoids constructing the index grid and patch tensor after dead-code
+elimination. The PyTorch printer reads the same affine window and calls
+`max_pool2d`, combining its result with the Remora initializer.
+
+On the isolated YOLO 13×13 pool over 512 channels of 19×19, the eight-thread
+median fell from 120 ms to 5 ms in IREE and from 340 ms to 5 ms in eager
+PyTorch. Both comparisons alternated the old and new lowering on the same
+input over seven measured runs and matched element for element.
+
+With `--structured-conv`, the compiler also follows the same window through
+a row-major reshape into a multiply-and-sum contraction. It checks the weight,
+patch, and reduction axes before emitting `linalg.conv_2d_nchw_fchw`. The
+PyTorch printer lowers that operation to `conv2d` and folds symmetric zero
+padding into the call when it can prove both sides are uniform zero.
+Use the flag when generating PyTorch. The default IREE lowering retains
+gather plus contraction because the named NCHW operation regressed on full
+YOLOv4 in the CPU configuration tested.
+
 | Operations | Representation |
 | --- | --- |
 | Static literals/empty arrays, local/global values | Constants, tensors, SSA, shared accessors |
@@ -94,6 +122,34 @@ The runner supplies that option; ordinary tensor optimization remains enabled.
 
 The [validation record](../validation/mlir-yolo.md) describes the actual run and
 independent OpenCV/Darknet comparison, including tool versions and asset hashes.
+
+## Run YOLOv4 on AMD HIP
+
+On the Radeon 780M, IREE's ROCm compiler target and HIP runtime passed the
+full YOLOv4 output comparison. The installed runtime reported `gfx1103`.
+
+```sh
+iree-run-module --list_devices=hip
+/tmp/remora-iree/bin/python scripts/run_yolo_mlir.py --rocm-target gfx1103 \
+  --image /tmp/yolo-input.bin --weights /tmp/yolov4.weights \
+  --output-dir /tmp/remora-yolo-hip
+```
+
+The option enables structured convolution and runs the result on the HIP
+device. The runner rejects an all-zero output. The verified 22,743×85
+HIP result had maximum absolute error 0.0000200 against the CPU reference
+and passed the existing OpenCV comparison. With resident arguments and
+output readback, the median was 1.51 s over seven timed runs after two
+warm-ups on the Radeon 780M.
+
+On the same GPU with RADV (Mesa 26.0.8), the Vulkan elementwise and
+standalone stride-two convolution controls passed. Both full YOLO variants
+returned all zeros. The model cut at convolution 59 matched CPU. A separately
+compiled cut at convolution 60 produced a partially zero tensor. The cut at
+convolution 61 was entirely zero. A build returning the operands to
+convolution 61 matched CPU, and that 1×1 convolution matched CPU exactly
+when run alone. The failure depends on the compiled graph. The tests do
+not isolate the underlying Vulkan compiler, runtime, or driver fault.
 
 ## Validation
 
@@ -158,8 +214,8 @@ polymorphism, dynamic/existential arrays, runtime function arrays, many unrelate
 intrinsics, and multi-axis computed frame constructors remain unsupported.
 Record operations are supported where components can be flattened; general
 record reductions are not implemented. Runtime file IO and tracing are rejected.
-There is no integrated `mlir --run`, general C/Python binding, or tested GPU
-pipeline. Out-of-bounds gathers do not have a Remora runtime error wrapper.
+The runner uses the IREE Python runtime. Out-of-bounds gathers do not have a
+Remora runtime error wrapper.
 
 The next optimization question is whether direct convolution recognition and
 layout choices improve this representation enough to justify their complexity.

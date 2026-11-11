@@ -45,15 +45,23 @@ def kernel_profile(args, values):
     categories = collections.Counter()
     for row in rows:
         key = row['key']
-        dispatch = re.search(r'dispatch_(\d+)_', key)[1]
-        source = args.dispatch_sources/f'module_main_dispatch_{dispatch}.mlir' if args.dispatch_sources else None
+        dispatch = re.search(r'dispatch_(\d+)(?:_|$)', key)
+        source = (args.dispatch_sources/f'module_main_dispatch_{dispatch[1]}.mlir'
+                  if args.dispatch_sources and dispatch else None)
         text = source.read_text() if source and source.exists() else ''
-        if 'matmul' in key:
+        if 'matmul' in key or 'linalg.matmul ' in text:
             category = 'matmul (including fused epilogues)'
+        elif re.search(r'dispatch_\d+_conv_', key):
+            category = 'direct convolution / pooling'
+        elif 'tensor.collapse_shape ' in text and re.search(
+                r'tensor<(?:\d+x){5}f32> into tensor<\d+x\d+xf32>', text):
+            category = 'im2col patch construction'
         elif key.endswith('_i64'):
             category = 'integer index arrays'
         elif 'tensor.extract ' in text:
             category = 'gathers / window materialization'
+        elif 'math.tanh' in text:
+            category = 'tanh (including fused Mish)'
         elif 'reduction' in key:
             category = 'reductions'
         elif 'memcpy' in key:

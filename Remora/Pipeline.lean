@@ -87,10 +87,12 @@ def compileWithASTsExp (e : UncheckedExp) : IO (Except String (List PassAST × S
       ⟨"lambdalift",Lean.toJson lifted⟩,⟨"defunctionalize",Lean.toJson defun⟩],ir)
   action.run
 /-- Compile through the standard preparation passes to the experimental MLIR backend. -/
-def compileMLIR (p : UncheckedProg) : IO (Except String String) := do
+def compileMLIR (p : UncheckedProg) (structuredConv := false) : IO (Except String String) := do
   return (← typeCheck p).bind fun p =>
     MLIR.compile (Defunctionalize.defunctionalize (LambdaLift.lambdaLift (Monomorphize.monomorphize p)))
-def compileMLIRExp (e : UncheckedExp) : IO (Except String String) := do
+      structuredConv
+def compileMLIRExp (e : UncheckedExp) (structuredConv := false) : IO (Except String String) := do
   return (← typeCheckExp e).bind fun e =>
     MLIR.compile (Defunctionalize.defunctionalize (LambdaLift.lambdaLiftExp (Monomorphize.monomorphizeExp e)))
+      structuredConv
 end Remora.Pipeline

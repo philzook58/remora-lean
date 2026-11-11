@@ -1,6 +1,7 @@
 import Lean
 import Remora.Prop
 import Remora.Intrinsics
+import Remora.Window
 
 /-! Static-shape Remora lowering to standard tensor/linalg MLIR.
 
@@ -22,6 +23,13 @@ structure Value where
   name : String
   ty : Ty
   deriving Inhabited
+structure WindowReduction where
+  source : Value
+  coordinates : List Sample
+  windows : List Int
+  reduced : List Nat := []
+  initials : List String := []
+
 structure Builder where
   next : Nat := 0
   lines : List String := []
@@ -35,6 +43,15 @@ structure Builder where
   viewFunctions : List (String × List (Nat × List Nat)) := []
   -- Additional prefix while lowering a rank-lifted array-cell helper in place.
   frame : List Int := []
+  -- Keep symbolic samples beside SSA values while maps and views are lowered.
+  samples : Std.HashMap String Sample := {}
+  sampleFunctions : Std.HashMap String (List (Option Sample)) := {}
+  windowReductions : Std.HashMap String WindowReduction := {}
+  structuredConv : Bool := false
+  windowFunctions : Std.HashSet String := {}
+  products : Std.HashMap String (Value × Value) := {}
+  contractions : Std.HashMap String (Value × Value) := {}
+  contractionFunctions : Std.HashMap String (Nat × Nat) := {}
 abbrev M := StateT Builder (Except String)
 private def fresh : M String := do
   let n := (← get).next
@@ -65,13 +82,33 @@ private def affine (rank : Nat) (axes : List Nat) :=
   accessMap rank (axes.map fun i => s!"d{i}")
 private def signature (xs : List Value) := String.intercalate ", " (xs.map fun x => toString x.ty)
 private def names (xs : List Value) := String.intercalate ", " (xs.map (·.name))
+private def sample (x : Value) : M (Option Sample) := do
+  let state ← get
+  match state.views.lookup x.name with
+  | none => return state.samples[x.name]?
+  | some (src, axes) =>
+    return state.samples[src.name]?.map (Sample.at (axes.map .axis))
+
+private def sampled (x : Value) (term : Option Sample) : M Value := do
+  if let some term := term then
+    modify fun s => {s with samples := s.samples.insert x.name term}
+  return x
+
 private def scalarOp (name : VName) (xs : List Value) (out : Ty) : M Value := do
   let ops := [("+","arith.addi"),("-","arith.subi"),("*","arith.muli"),
     ("f.+","arith.addf"),("f.-","arith.subf"),("f.*","arith.mulf")]
   if name.varTag < intrinsicTypes.length then
     let some op := ops.lookup name.varName | throw s!"unsupported intrinsic {name.varName}"
     unless xs.length == 2 do throw "arithmetic requires two operands"
-    emit out s!"{op} {names xs} : {out}"
+    let value ← emit out s!"{op} {names xs} : {out}"
+    if out.base != "i64" then return value
+    let terms ← xs.mapM sample
+    let term := match name.varName, terms with
+      | "+", [some a,some b] => some (.add a b)
+      | "-", [some a,some b] => some (.sub a b)
+      | "*", [some a,some b] => some (.mul a b)
+      | _, _ => none
+    sampled value term
   else
     emit out s!"func.call {symbol name}({names xs}) : ({signature xs}) -> {out}"
 private partial def types (t : ArrayType VName) : Except String (List Ty) := do
@@ -127,8 +164,21 @@ private def generate (t : Ty) (f : List Value → M Value) : M Value := do
   line s!"linalg.yield {value.name} : {t.base}"
   line s!"} -> {t}"
   return ⟨name,t⟩
+private inductive Access where
+  | axis (i : Nat)
+  | constant (i : Int)
+  deriving Inhabited
+
+private def Access.sample : Access → Sample
+  | .axis i => .axis i
+  | .constant i => .int i
+
+private def Access.render : Access → String
+  | .axis i => s!"d{i}"
+  | .constant i => toString i
+
 -- Explicit input maps let fusion see through broadcasts and permutations.
-private def mappedWithMaps (out : Ty) (xs : List Value) (accesses : List (List String))
+private def mappedWithMaps (out : Ty) (xs : List Value) (accesses : List (List Access))
     (f : List Value → M Value) : M Value := do
   if out.dims.isEmpty then return ← f xs
   let sources ← xs.mapM storage
@@ -136,7 +186,7 @@ private def mappedWithMaps (out : Ty) (xs : List Value) (accesses : List (List S
   let inputs := actual.filter fun x => !x.ty.dims.isEmpty
   let maps := ((sources.zip accesses).filterMap fun ((x,axes),access) =>
     if x.ty.dims.isEmpty then none else
-      some (accessMap out.dims.length (axes.map fun i => access[i]!))) ++
+      some (accessMap out.dims.length (axes.map fun i => access[i]!.render))) ++
     [affine out.dims.length (List.range out.dims.length)]
   let dest ← emit out s!"tensor.empty() : {out}"
   let result ← fresh
@@ -150,19 +200,21 @@ private def mappedWithMaps (out : Ty) (xs : List Value) (accesses : List (List S
     [s!"{unused}: {out.base}"]) ++ "):")
   let mut remaining := args
   let mut operands := []
-  for x in actual do
+  for ((x, axes), access) in sources.zip accesses do
     if x.ty.dims.isEmpty then operands := operands ++ [x]
     else
       let a::rest := remaining | throw "missing region operand"
       remaining := rest
+      let term ← sample x
+      let a ← sampled a (term.map (Sample.at (axes.map fun i => access[i]!.sample)))
       operands := operands ++ [a]
   let value ← f operands
   line s!"linalg.yield {value.name} : {out.base}"
   line s!"} -> {out}"
-  return ⟨result,out⟩
+  sampled ⟨result,out⟩ (← sample value)
 private def mappedAt (out : Ty) (xs : List Value) (axes : List (List Nat))
     (f : List Value → M Value) : M Value :=
-  mappedWithMaps out xs (axes.map fun axes => axes.map fun i => s!"d{i}") f
+  mappedWithMaps out xs (axes.map fun axes => axes.map .axis) f
 private def mapped (out : Ty) (xs : List Value) (f : List Value → M Value) : M Value :=
   mappedAt out xs (xs.map fun x => List.range x.ty.dims.length) f
 -- Materialize only at boundaries that require an ordinary SSA tensor.
@@ -174,6 +226,9 @@ private def reshape (x : Value) (t : Ty) : M Value := do
   if t.dims.isEmpty then
     let zs ← x.ty.dims.mapM fun _ => indexConstant 0
     return ← extract x zs
+  let state ← get
+  let patch := if state.structuredConv then
+    state.windowReductions[x.name]?.filter (·.reduced.isEmpty) else none
   let x ← materialize x
   let x ← if x.ty.dims.isEmpty then
     emit ⟨x.ty.base,[1]⟩ s!"tensor.from_elements {x.name} : tensor<1x{x.ty.base}>"
@@ -182,7 +237,10 @@ private def reshape (x : Value) (t : Ty) : M Value := do
   let dims ← fresh
   let sizes := String.intercalate ", " (t.dims.map toString)
   line s!"{dims} = arith.constant dense<[{sizes}]> : {st}"
-  emit t s!"tensor.reshape {x.name}({dims}) : ({x.ty}, {st}) -> {t}"
+  let value ← emit t s!"tensor.reshape {x.name}({dims}) : ({x.ty}, {st}) -> {t}"
+  if let some patch := patch then
+    modify fun s => {s with windowReductions := s.windowReductions.insert value.name patch}
+  return value
 private def slice (x : Value) (i : Value) : M Value := do
   let t := {x.ty with dims := x.ty.dims.drop 1}
   if t.dims.isEmpty then return ← extract x [i]
@@ -263,6 +321,65 @@ private def principal (frames : List (List Int)) : M (List Int) := do
   let frame := frames.foldl (fun a b => if a.length < b.length then b else a) []
   unless frames.all (fun f => f == frame.take f.length) do throw s!"incompatible prefix frames {frames}"
   return frame
+private def emitMaxPool (window : WindowReduction) (pool : SpatialWindow) (out : Ty) : M Value := do
+  let input ← reshape window.source {window.source.ty with dims := 1 :: window.source.ty.dims}
+  let resultTy := {out with dims := 1 :: out.dims}
+  let init ← generate resultTy fun _ => do
+    let ty : Ty := ⟨"f32", []⟩
+    let mut value ← emit ty s!"arith.constant {window.initials.head!} : f32"
+    for literal in window.initials.tail! do
+      if literal != window.initials.head! then
+        let v ← emit ty s!"arith.constant {literal} : f32"
+        value ← emit ty s!"arith.maximumf {value.name}, {v.name} : f32"
+    return value
+  let kernelTy : Ty := ⟨"f32", pool.kernel⟩
+  let kernel ← emit kernelTy s!"tensor.empty() : {kernelTy}"
+  -- Spell out the affine access. IREE 3.13 miscompiles the equivalent
+  -- named NCHW pooling op on CPU.
+  let spatial := (pool.strides.zip pool.dilations).zipIdx.map fun ((stride,dilation),i) =>
+    s!"d{i+2} * {stride} + d{i+4} * {dilation}"
+  let maps := [accessMap 6 (["d0","d1"] ++ spatial), affine 6 [4,5], affine 6 [0,1,2,3]]
+  let iters := String.intercalate ", "
+    (List.replicate 4 "\"parallel\"" ++ List.replicate 2 "\"reduction\"")
+  let result ← fresh
+  line <| s!"{result} = linalg.generic \{indexing_maps = [{String.intercalate ", " maps}], " ++
+    s!"iterator_types = [{iters}]} ins({input.name}, {kernel.name} : {input.ty}, {kernelTy}) " ++
+    s!"outs({init.name} : {resultTy}) \{"
+  let a ← fresh
+  let unused ← fresh
+  let b ← fresh
+  line s!"^bb0({a}: f32, {unused}: f32, {b}: f32):"
+  let value ← emit ⟨"f32",[]⟩ s!"arith.maximumf {b}, {a} : f32"
+  line s!"linalg.yield {value.name} : f32"
+  line s!"} -> {resultTy}"
+  let result : Value := ⟨result,resultTy⟩
+  reshape result out
+
+-- The two flattened operands must be [filter, C*KH*KW] and [C*KH*KW, OH*OW].
+private def convolution (weight patches : Value) (out : Ty) : M (Option Value) := do
+  let some patch := (← get).windowReductions[patches.name]? | return none
+  let [c,kh,kw,oh,ow] := patch.windows | return none
+  let [filters,k] := weight.ty.dims | return none
+  if !patch.reduced.isEmpty || weight.ty.base != "f32" || filters <= 0 ||
+      k != c*kh*kw || patches.ty.dims != [k,oh*ow] || out.dims != [filters,oh*ow] then
+    return none
+  let some window := spatialWindow patch.source.ty.dims patch.windows [c,oh,ow] [1,2]
+      patch.coordinates | return none
+  let input ← reshape patch.source {patch.source.ty with dims := 1 :: patch.source.ty.dims}
+  let weight ← reshape weight ⟨"f32",[filters,c,kh,kw]⟩
+  let resultTy : Ty := ⟨"f32",[1,filters,oh,ow]⟩
+  let zero ← emit ⟨"f32",[]⟩ "arith.constant 0.0 : f32"
+  let dest ← emit resultTy s!"tensor.empty() : {resultTy}"
+  let init ← emit resultTy <|
+    s!"linalg.fill ins({zero.name} : f32) outs({dest.name} : {resultTy}) -> {resultTy}"
+  let dense (xs : List Int) :=
+    s!"dense<[{String.intercalate ", " (xs.map toString)}]> : vector<2xi64>"
+  let value ← emit resultTy <|
+    s!"linalg.conv_2d_nchw_fchw \{strides = {dense window.strides}, " ++
+    s!"dilations = {dense window.dilations}} ins({input.name}, {weight.name} : " ++
+    s!"{input.ty}, {weight.ty}) outs({init.name} : {resultTy}) -> {resultTy}"
+  return some (← reshape value out)
+
 private def appArgs : Exp → Exp × List Exp × List (ArrayType VName)
   | .app f x .. =>
     let (root,xs,ps) := appArgs f
@@ -279,21 +396,36 @@ private partial def applyName (name : VName) (xs : List (List Value))
   let xs ← xs.mapM fun vs => vs.mapM materialize
   let flat := xs.flatten
   if name.varTag >= intrinsicTypes.length then
-    return ← emitResults ts s!"func.call {symbol name}({names flat}) : ({signature flat}) -> {returnTypes ts}"
+    if let (some (w,p), [out]) := ((← get).contractionFunctions[symbol name]?, ts) then
+      if let some value ← convolution flat[w]! flat[p]! out then return [value]
+    let results ← emitResults ts
+      s!"func.call {symbol name}({names flat}) : ({signature flat}) -> {returnTypes ts}"
+    if let some summaries := (← get).sampleFunctions[symbol name]? then
+      let arguments ← flat.mapM sample
+      return ← (results.zip summaries).mapM fun (value,summary) =>
+        sampled value (summary.bind fun
+          | .parameter i => arguments[i]?.join
+          | .float literal => some (.float literal)
+          | _ => none)
+    return results
   let out ← one ts
   let x : Nat → M Value := fun n => do one (← match xs[n]? with | some x => pure x | none => throw "missing argument")
   if name.varName == "iota/static" then
-    return [← generate out fun indices => do
+    let value ← generate out fun indices => do
       let mut acc ← indexConstant 0
       for (i,d) in indices.zip out.dims do
         let dim ← indexConstant d
         acc ← emit ⟨"index",[]⟩ s!"arith.muli {acc.name}, {dim.name} : index"
         acc ← emit ⟨"index",[]⟩ s!"arith.addi {acc.name}, {i.name} : index"
-      emit ⟨"i64",[]⟩ s!"arith.index_cast {acc.name} : index to i64"]
+      emit ⟨"i64",[]⟩ s!"arith.index_cast {acc.name} : index to i64"
+    let term := ((Sample.axes out.dims.length).zip out.dims).foldl
+      (fun acc (i,d) => .add (.mul acc (.int d)) i) (.int 0)
+    return [← sampled value (some term)]
   if ["reshape","flatten"].contains name.varName then return [← reshape (← x 0) out]
   if name.varName == "transpose2d" then
     let a ← x 0
-    return [← mappedAt out [a] [[1,0]] fun vs => one vs]
+    if (← get).structuredConv then return [← project a out [1,0]]
+    return [← mappedAt out [a] [[1,0]] one]
   if name.varName == "append" then
     let a ← x 0
     let b ← x 1
@@ -369,7 +501,7 @@ private partial def reduction (name : VName) (args : List Exp)
     let n := cell.headD 0
     if name.varName == "reduce" && n == 0 then throw "empty nonzero reduction"
     let inputTy := {input.ty with dims := frame ++ cell}
-    let input ← materialize (← broadcast input inputTy inputFrame frame.length)
+    let input ← broadcast input inputTy inputFrame frame.length
     let out ← one ts
     let tensorOut := "tensor<" ++ String.join (out.dims.map fun n => s!"{n}x") ++ out.base ++ ">"
     let initial ← if name.varName == "reduce/zero" then do
@@ -382,7 +514,35 @@ private partial def reduction (name : VName) (args : List Exp)
           else if reducer.varName == "f.min" then "0x7F800000"
           else if out.base == "f32" then "0.0" else "0"
         let v ← emit ⟨out.base,[]⟩ s!"arith.constant {identity} : {out.base}"
+        let v ← sampled v (if out.base == "f32" then some (.float identity) else none)
         broadcast v out 0 out.dims.length
+    let contract ← do
+      if reducer.varName != "f.+" || frame.length != 2 then pure none
+      else
+        match ← sample initial with
+        | some (.float literal) =>
+          if ["0.0","0.000000"].contains literal then
+            pure ((← get).products[input.name]?)
+          else pure none
+        | _ => pure none
+    if let some (w,p) := contract then
+      if let some value ← convolution w p out then return [value]
+    -- Follow consecutive max reductions back to the original gather.
+    let mut nextWindow := none
+    if reducer.varName == "f.max" && n > 0 then
+      if let some (.float literal) ← sample initial then
+        if let some window := (← get).windowReductions[input.name]? then
+          let remaining := (List.range window.windows.length).filter (!window.reduced.contains ·)
+          if input.ty.dims == remaining.map (fun i => window.windows[i]!) then
+            if let some axis := remaining[frame.length]? then
+              let window := {window with reduced := window.reduced ++ [axis],
+                                         initials := window.initials ++ [literal]}
+              if window.reduced.length == 2 then
+                if let some pool := spatialWindow window.source.ty.dims window.windows out.dims
+                    window.reduced window.coordinates (allowSwappedKernel := true) then
+                  return [← emitMaxPool window pool out]
+              else nextWindow := some window
+    let input ← materialize input
     let initial ← materialize initial
     let init ← if out.dims.isEmpty then do
         let v ← fresh
@@ -403,6 +563,10 @@ private partial def reduction (name : VName) (args : List Exp)
     line s!"linalg.yield {v.name} : {out.base}"
     line s!"} -> {tensorOut}"
     if out.dims.isEmpty then return [← emit out s!"tensor.extract {result}[] : {tensorOut}"]
+    if let some window := nextWindow then
+      modify fun s => {s with windowReductions := s.windowReductions.insert result window}
+    if let some operands := contract then
+      modify fun s => {s with contractions := s.contractions.insert result operands}
     return [⟨result,out⟩]
   let allRanks := captureFrames.map List.length ++ ranks
   return ← mapCells frame allRanks (captured ++ vals) ts fun operands ts => do
@@ -446,7 +610,9 @@ private partial def application (e : Exp) (ts : List Ty) : M (List Value) := do
       let x ← one values.flatten
       let r := frame.length
       let axes := List.range r ++ [r+1,r] ++ (List.range (x.ty.dims.length-r-2)).map (· + r+2)
-      return [← mappedAt (← one ts) [x] [axes] fun vs => one vs]
+      let out ← one ts
+      if (← get).structuredConv then return [← project x out axes]
+      return [← mappedAt out [x] [axes] one]
     if name.varName == "append" then
       let xs ← ((values.zip ranks).zip ps).mapM fun ((vs,r),p) => do
         let x ← one vs
@@ -464,17 +630,28 @@ private partial def application (e : Exp) (ts : List Ty) : M (List Value) := do
       -- Capturing these tensors through tensor.extract prevents that fusion.
       if name.varName != "head" && ranks[1]! > 0 then
         let idx ← one values[1]!
-        let coordAxes := (List.range ranks[1]!).map fun i => s!"d{i}"
+        let coordAxes := (List.range ranks[1]!).map Access.axis
         let maps := if name.varName == "index" then
             [coordAxes]
-          else [coordAxes ++ ["0"], coordAxes ++ ["1"]]
+          else [coordAxes ++ [.constant 0], coordAxes ++ [.constant 1]]
         let inputs := maps.map fun _ => idx
-        return [← mappedWithMaps out inputs maps fun components => do
+        let result ← mappedWithMaps out inputs maps fun components => do
           let coordinates ← (List.range ranks.head!).mapM fun i =>
             emit ⟨"index",[]⟩ s!"linalg.index {i} : index"
           let tail ← ((List.range out.dims.length).drop frame.length).mapM fun i =>
             emit ⟨"index",[]⟩ s!"linalg.index {i} : index"
-          extract x (coordinates ++ (← components.mapM asIndex) ++ tail)]
+          extract x (coordinates ++ (← components.mapM asIndex) ++ tail)
+        if name.varName == "index2d" && out.dims.length == 5 && out.base == "f32" then
+          let (source, axes) ← storage x
+          if source.ty.dims.length == 3 then
+            if let some term ← sample idx then
+              let coords := Sample.axes ranks.head! ++ maps.map (fun m => term.at (m.map Access.sample)) ++
+                ((List.range out.dims.length).drop frame.length).map Sample.axis
+              if let some coordinates := axes.mapM (fun i => coords[i]?) then
+                let window : WindowReduction := ⟨source, coordinates, out.dims, [], []⟩
+                modify fun s =>
+                  {s with windowReductions := s.windowReductions.insert result.name window}
+        return [result]
       return [← generate out fun indices => do
         let mut coordinates := indices.take ranks.head!
         if name.varName == "head" then coordinates := coordinates ++ [← indexConstant 0]
@@ -496,8 +673,20 @@ private partial def application (e : Exp) (ts : List Ty) : M (List Value) := do
   if scalarCells && ts.length == 1 && ts.head!.dims.length == frame.length && !frame.isEmpty then
     let xs ← values.mapM one
     let out ← one ts
-    return [← mapped out xs fun xs => do one (← applyName name (xs.map fun x => [x]) [⟨out.base,[]⟩])]
-  if name.varTag >= intrinsicTypes.length && !frame.isEmpty then
+    let value ← mapped out xs fun xs => do
+      one (← applyName name (xs.map fun x => [x]) [⟨out.base,[]⟩])
+    if (← get).structuredConv && name.varTag < intrinsicTypes.length &&
+        name.varName == "f.*" && frame.length == 3 then
+      if let [(a,axesA), (b,axesB)] ← xs.mapM storage then
+        let operands := match axesA, axesB with
+          | [0,2], [2,1] => some (a,b)
+          | [2,1], [0,2] => some (b,a)
+          | _, _ => none
+        if let some pair := operands then
+          modify fun s => {s with products := s.products.insert value.name pair}
+    return [value]
+  if name.varTag >= intrinsicTypes.length &&
+      (!frame.isEmpty || (← get).windowFunctions.contains (symbol name)) then
     let some (params,body) := (← get).definitions.lookup name | throw s!"unknown function {name}"
     let old := (← get).env
     let oldFrame := (← get).frame
@@ -535,7 +724,11 @@ private partial def expressionRaw (e : Exp) : M (List Value) := do
         | .base (.intVal n) .. => pure (toString n)
         | .base (.floatVal n) .. => pure (toString n)
         | _ => throw "unsupported array element"
-      if out.dims.isEmpty then return [← emit out s!"arith.constant {vals.head!} : {out}"]
+      if out.dims.isEmpty then
+        let value ← emit out s!"arith.constant {vals.head!} : {out}"
+        let term := if out.base == "f32" then some (.float vals.head!)
+          else if out.base == "i64" then vals.head!.toInt?.map Sample.int else none
+        return [← sampled value term]
       let vs ← vals.mapM fun n => emit ⟨out.base,[]⟩ s!"arith.constant {n} : {out.base}"
       let flat : Ty := ⟨out.base,[Int.ofNat vs.length]⟩
       return [← reshape (← emit flat s!"tensor.from_elements {names vs} : {flat}") out]
@@ -568,7 +761,11 @@ private partial def expressionRaw (e : Exp) : M (List Value) := do
           for (a,n) in args.dropLast.zipIdx do
             let k ← indexConstant n
             let c ← emit ⟨"i1",[]⟩ s!"arith.cmpi eq, {i.name}, {k.name} : index"
+            let yes ← sample a
+            let no ← sample v
             v ← emit a.ty s!"arith.select {c.name}, {a.name}, {v.name} : {a.ty}"
+            if let (some yes, some no) := (yes,no) then
+              v ← sampled v (some (.select (.axis frame.length) n yes no))
           return v
     | .letE bs body .. =>
       for b in bs.toList do binding b
@@ -606,19 +803,37 @@ private def function (name : String) (ps : List Pat) (body : Exp) (exported := f
   let old := (← get).env
   let oldLines := (← get).lines
   let oldViews := (← get).views
-  modify fun s => {s with env := [], lines := [], views := []}
+  modify fun s =>
+    {s with env := [], lines := [], views := [], samples := {}, windowReductions := {}
+            products := {}, contractions := {}}
   let mut params := []
   for p in ps do
     let ts ← liftM (types (patType p))
-    let xs ← ts.mapM fun t => return Value.mk (← fresh) t
+    let xs ← ts.zipIdx.mapM fun (t,i) => do
+      let x := Value.mk (← fresh) t
+      let term := if t.dims.isEmpty && t.base == "f32" then some (.parameter (params.length+i)) else none
+      sampled x term
     bind (patVar p) xs
     params := params ++ xs
   let result ← expression body
+  if let (true, [value]) := ((← get).structuredConv, result) then
+    if value.ty.dims.length == 2 && ((← get).windowReductions[value.name]?).isSome then
+      modify fun s => {s with windowFunctions := s.windowFunctions.insert name}
+    if let some (w,p) := (← get).contractions[value.name]? then
+      let indexOf (x : Value) := (params.zipIdx.find? (fun (v,_) => v.name == x.name)).map Prod.snd
+      if let (some i, some j) := (indexOf w, indexOf p) then
+        modify fun s => {s with contractionFunctions := s.contractionFunctions.insert name (i,j)}
   let aliases ← result.mapM fun x => do
     let (source,axes) ← storage x
     return (params.zipIdx.find? fun (p,_) => p.name == source.name).map fun (_,i) => (i,axes)
   if aliases.all Option.isSome then
     modify fun s => {s with viewFunctions := (name,aliases.filterMap id) :: s.viewFunctions}
+  let summaries ← result.mapM fun x => do
+    return (← sample x).filter fun
+      | .parameter _ | .float _ => true
+      | _ => false
+  if summaries.any Option.isSome then
+    modify fun s => {s with sampleFunctions := s.sampleFunctions.insert name summaries}
   let result ← result.mapM materialize
   let lines := (← get).lines
   let header := String.intercalate ", " (params.map fun x => s!"{x.name}: {x.ty}")
@@ -628,7 +843,7 @@ private def function (name : String) (ps : List Pat) (body : Exp) (exported := f
     String.intercalate "\n" lines ++ s!"\nreturn {names result} : {signature result}\n}"
   modify fun s => {s with env := old, lines := oldLines, views := oldViews, functions := s.functions ++ [text]}
 /-- Emit ordinary static-shape Remora, preserving array cells and flattening records. -/
-def compile (p : Prog) : Except String String := do
+def compile (p : Prog) (structuredConv := false) : Except String String := do
   unless p.progDecs.any (fun d => match d with | .entry .. => true | _ => false) do
     throw "MLIR: program has no entry point"
   let globals ← p.progDecs.filterMap (fun d => match d with
@@ -642,6 +857,6 @@ def compile (p : Prog) : Except String String := do
     | _ => throw "MLIR: residual polymorphic declaration"
   let definitions := p.progDecs.filterMap fun d => match d with
     | .defE (.funE v ps _ e ..) => some (v,(ps.toList,e)) | _ => none
-  let (_,s) ← action.run {globals,definitions}
+  let (_,s) ← action.run {globals,definitions,structuredConv}
   return "module {\n" ++ String.intercalate "\n" s.functions ++ "\n}\n"
 end Remora.MLIR
