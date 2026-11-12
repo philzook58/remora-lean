@@ -1,0 +1,7 @@
+(entry (main (input [Float 64 4096]))
+ ((fn ((row [Float 4096]))
+   (let ((fun (window (offset Int))
+     (@reduce/zero (Float) (13 []) f.+ 0.0
+       (@index (Float) (4096) row (+ offset (i-app iota/static [13]))))))
+     (window (i-app iota/static [4084]))))
+  input))

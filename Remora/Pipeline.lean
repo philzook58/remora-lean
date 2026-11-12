@@ -3,6 +3,7 @@ import Remora.Uniquify
 import Remora.TypeCheck
 import Remora.Intrinsics
 import Remora.Interpreter
+import Remora.MLIR
 import Remora.Futhark
 import Remora.Monomorphize
 import Remora.LambdaLift
@@ -85,4 +86,13 @@ def compileWithASTsExp (e : UncheckedExp) : IO (Except String (List PassAST × S
       ⟨"typecheck",Lean.toJson checked⟩,⟨"monomorphize",Lean.toJson mono⟩,
       ⟨"lambdalift",Lean.toJson lifted⟩,⟨"defunctionalize",Lean.toJson defun⟩],ir)
   action.run
+/-- Compile through the standard preparation passes to the experimental MLIR backend. -/
+def compileMLIR (p : UncheckedProg) (structuredConv := false) : IO (Except String String) := do
+  return (← typeCheck p).bind fun p =>
+    MLIR.compile (Defunctionalize.defunctionalize (LambdaLift.lambdaLift (Monomorphize.monomorphize p)))
+      structuredConv
+def compileMLIRExp (e : UncheckedExp) (structuredConv := false) : IO (Except String String) := do
+  return (← typeCheckExp e).bind fun e =>
+    MLIR.compile (Defunctionalize.defunctionalize (LambdaLift.lambdaLiftExp (Monomorphize.monomorphizeExp e)))
+      structuredConv
 end Remora.Pipeline
