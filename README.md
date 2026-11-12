@@ -11,6 +11,14 @@ to tensors, lifting, quantifiers, and the compiler. The accompanying
 [code map](docs/understanding.md) follows one program through the actual passes.
 After building, run `lake env lean Understanding.lean` or open it in the Lean editor.
 
+## AI Disclosure
+
+This was heavily AI produced and heavily based on the human work in the remora implementation. I take no credit and no blame.
+
+It is unlikely to be of interest to you and I'll probably abandon it.
+
+I don't really intend to use Lean as a verification language, just as a Haskell stand-in I'm more comfortable with currently.
+
 ## Build and run
 
 Install Elan, then run:
